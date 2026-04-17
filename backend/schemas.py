@@ -2,14 +2,9 @@ from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from enum import Enum
 from datetime import datetime
+from constants import QuestionType
 
 
-# 1. Match our Pydantic Enum to our SQLAlchemy Enum
-class QuestionTypeEnum(str, Enum):
-    SCALE = "scale"
-    TEXT_OPEN = "text_open"
-    SINGLE_CHOICE = "single_choice"
-    MULTIPLE_CHOICE = "multiple_choice"
 
 # ==========================================
 # CREATE SCHEMAS (Incoming data from React)
@@ -22,7 +17,7 @@ class OptionCreate(BaseModel):
 class QuestionCreate(BaseModel):
     text: str
     is_required: bool = True
-    question_type: QuestionTypeEnum
+    question_type: QuestionType
     order: int
     # Optional fields (only used if type is 'scale')
     scale_min: Optional[int] = None
@@ -61,7 +56,7 @@ class QuestionResponse(BaseModel):
     id: int
     text: str
     is_required: bool
-    question_type: QuestionTypeEnum
+    question_type: QuestionType
     order: int
     scale_min: Optional[int]
     scale_max: Optional[int]

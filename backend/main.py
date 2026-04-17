@@ -6,6 +6,7 @@ from typing import List
 
 
 
+
 # my classes
 import models
 import schemas
@@ -86,7 +87,7 @@ def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db)):
                 page_id=db_page.id,
                 text=q_in.text,
                 is_required=q_in.is_required,
-                question_type=q_in.question_type,
+                question_type=q_in.question_type.value,
                 order=q_in.order,
                 scale_min=q_in.scale_min,
                 scale_max=q_in.scale_max,

@@ -4,14 +4,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy import Table, DateTime
 from datetime import datetime
 from database import Base
-
-# 1. Define the allowed Question Types using a Python Enum
-# This prevents bad data (like someone sending type="slider") from entering the database
-class QuestionType(enum.Enum):
-    SCALE = "scale"
-    TEXT_OPEN = "text_open"
-    SINGLE_CHOICE = "single_choice"
-    MULTIPLE_CHOICE = "multiple_choice"
+from constants import QuestionType
 
 class Form(Base):
     __tablename__ = "forms"
