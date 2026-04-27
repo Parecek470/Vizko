@@ -13,17 +13,17 @@ function App() {
         <CssBaseline />
 
         {/* Box is an MUI component that acts like a <div> but handles styling beautifully */}
-        <Box sx={{ display: 'flex',width:'100vw', height: '100vh', backgroundColor: '#f5f5f5' }}>
+        <Box sx={{ display: 'flex', height: '100vh', backgroundColor: '#f5f5f5',overflowX: 'hidden' }}>
 
           {/* Left Side: The Navigation List */}
           <Sidebar />
 
           {/* Right Side: The Main Content Area */}
-          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', height:'100vh' }}>
             <Topbar />
 
             {/* This is where React Router swaps out the main screen */}
-            <Box sx={{ padding: 4, overflowY: 'auto' }}>
+            <Box sx={{ flexGrow:1, overflow:'hidden'}}>
               <Routes>
                 {/* Default page: Maybe a welcome screen, or just the builder for now */}
                 <Route path="/" element={<FormBuilder />} />

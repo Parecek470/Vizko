@@ -194,7 +194,7 @@ export default function FormBuilder() {
                         <InputLabel>Question Type</InputLabel>
                         <Select value={question.question_type} label="Question Type" onChange={(e) => handleQuestionChange(pIdx, qIdx, 'question_type', e.target.value)}>
                             <MenuItem value="single_choice">Single Choice</MenuItem>
-                            <MenuItem value="MULTIPLE_CHOICE">Multiple Choice</MenuItem>
+                            <MenuItem value="multiple_choice">Multiple Choice</MenuItem>
                             <MenuItem value="scale">Scale (1-N)</MenuItem>
                             <MenuItem value="text_open">Open Text</MenuItem>
                         </Select>
@@ -251,27 +251,10 @@ export default function FormBuilder() {
     };
 
     return (
-        <Box sx={{ display: 'flex', width: '100%', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', width: '100%', height: '100%'}}>
 
             {/* ========================================== */}
-            {/* LEFT PANEL: The Settings Window            */}
-            {/* ========================================== */}
-            <Box sx={{
-                width: 350,
-                flexShrink: 0,
-                borderRight: '1px solid #e0e0e0',
-                backgroundColor: '#ffffff',
-                p: 3,
-                overflowY: 'auto',
-                boxShadow: '2px 0 5px rgba(0,0,0,0.05)',
-                zIndex: 10
-            }}>
-                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
-                {renderEditorPanel()}
-            </Box>
-
-            {/* ========================================== */}
-            {/* MIDDLE PANEL: The Canvas View              */}
+            {/* MAIN PANEL: The Canvas View (Now on Left)  */}
             {/* ========================================== */}
             <Box sx={{
                 flexGrow: 1,
@@ -350,6 +333,24 @@ export default function FormBuilder() {
                     </Button>
                 </Box>
             </Box>
+
+            {/* ========================================== */}
+            {/* RIGHT PANEL: The Settings Window           */}
+            {/* ========================================== */}
+            <Box sx={{
+                width: 350,
+                flexShrink: 0,
+                borderLeft: '1px solid #e0e0e0', // Changed from borderRight
+                backgroundColor: '#ffffff',
+                p: 3,
+                overflowY: 'auto',
+                boxShadow: '-2px 0 5px rgba(0,0,0,0.05)', // Flipped shadow direction
+                zIndex: 10
+            }}>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                {renderEditorPanel()}
+            </Box>
+
         </Box>
     );
 }
