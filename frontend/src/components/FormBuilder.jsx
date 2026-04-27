@@ -8,40 +8,44 @@ import {
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 export default function FormBuilder() {
     const navigate = useNavigate();
 
-    // --- Form-Level State ---
+    // --- State ---
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [isActive, setIsActive] = useState(false);
 
-    // --- Nested State ---
-    // Initialize with one empty page to start
     const [pages, setPages] = useState([{
         page_number: 1,
         title: '',
         questions: []
     }]);
 
+    // Track what is currently active in the left editing panel
+    const [selectedItem, setSelectedItem] = useState({ type: 'form', pageIndex: null, qIndex: null });
+
     const [error, setError] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // ==========================================
-    // STATE MUTATION HANDLERS
+    // MUTATION HANDLERS (Same as before)
     // ==========================================
 
     const handleAddPage = () => {
-        setPages([...pages, { page_number: pages.length + 1, title: '', questions: [] }]);
+        const newPages = [...pages, { page_number: pages.length + 1, title: '', questions: [] }];
+        setPages(newPages);
+        setSelectedItem({ type: 'page', pageIndex: newPages.length - 1, qIndex: null });
     };
 
     const handleRemovePage = (pageIndex) => {
         const newPages = [...pages];
         newPages.splice(pageIndex, 1);
-        // Re-index page numbers
         newPages.forEach((p, i) => p.page_number = i + 1);
         setPages(newPages);
+        setSelectedItem({ type: 'form', pageIndex: null, qIndex: null }); // Reset selection
     };
 
     const handlePageChange = (pageIndex, field, value) => {
@@ -53,33 +57,33 @@ export default function FormBuilder() {
     const handleAddQuestion = (pageIndex) => {
         const newPages = [...pages];
         const newQuestion = {
-            text: '',
+            text: 'New Question',
             question_type: 'single_choice',
             is_required: true,
             order: newPages[pageIndex].questions.length + 1,
-            options: [] // Empty by default
+            options: []
         };
         newPages[pageIndex].questions.push(newQuestion);
         setPages(newPages);
+
+        // Auto-select the newly created question
+        setSelectedItem({ type: 'question', pageIndex, qIndex: newPages[pageIndex].questions.length - 1 });
     };
 
     const handleRemoveQuestion = (pageIndex, qIndex) => {
         const newPages = [...pages];
         newPages[pageIndex].questions.splice(qIndex, 1);
-        // Re-index question order
         newPages[pageIndex].questions.forEach((q, i) => q.order = i + 1);
         setPages(newPages);
+        setSelectedItem({ type: 'page', pageIndex, qIndex: null }); // Fallback selection
     };
 
     const handleQuestionChange = (pageIndex, qIndex, field, value) => {
         const newPages = [...pages];
         newPages[pageIndex].questions[qIndex][field] = value;
-
-        // If they switch to a text_open or scale question, clear options to keep payload clean
         if (field === 'question_type' && (value === 'text_open' || value === 'scale')) {
             newPages[pageIndex].questions[qIndex].options = [];
         }
-
         setPages(newPages);
     };
 
@@ -95,7 +99,6 @@ export default function FormBuilder() {
     const handleRemoveOption = (pageIndex, qIndex, optIndex) => {
         const newPages = [...pages];
         newPages[pageIndex].questions[qIndex].options.splice(optIndex, 1);
-        // Re-index option order
         newPages[pageIndex].questions[qIndex].options.forEach((opt, i) => opt.order = i + 1);
         setPages(newPages);
     };
@@ -106,29 +109,19 @@ export default function FormBuilder() {
         setPages(newPages);
     };
 
-    // ==========================================
-    // SUBMISSION HANDLER
-    // ==========================================
-
     const handleSubmit = async () => {
         if (!title.trim()) {
             setError("Form title is required.");
+            setSelectedItem({ type: 'form', pageIndex: null, qIndex: null });
             return;
         }
 
         setIsSubmitting(true);
         setError(null);
 
-        // Construct payload exactly matching schemas.py -> FormCreate
-        const payload = {
-            title: title,
-            description: description,
-            is_active: isActive,
-            pages: pages
-        };
+        const payload = { title, description, is_active: isActive, pages };
 
         try {
-            console.log(payload);
             const response = await fetch('http://localhost:8000/forms/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -149,174 +142,213 @@ export default function FormBuilder() {
         }
     };
 
+
     // ==========================================
-    // RENDER
+    // RENDER HELPERS
     // ==========================================
+
+    // Dynamic Left Panel Content based on what is selected
+    const renderEditorPanel = () => {
+        if (selectedItem.type === 'form') {
+            return (
+                <Box>
+                    <Typography variant="h6" gutterBottom>Form Settings</Typography>
+                    <TextField label="Form Title" fullWidth variant="outlined" value={title} onChange={(e) => setTitle(e.target.value)} sx={{ mb: 2 }} required />
+                    <TextField label="Description" fullWidth variant="outlined" multiline rows={3} value={description} onChange={(e) => setDescription(e.target.value)} sx={{ mb: 2 }} />
+                    <FormGroup>
+                        <FormControlLabel control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Set as Active (Live)" />
+                    </FormGroup>
+                    <Divider sx={{ my: 3 }} />
+                    <Button variant="contained" color="success" fullWidth size="large" onClick={handleSubmit} disabled={isSubmitting}>
+                        {isSubmitting ? 'Saving...' : 'Save & Publish Form'}
+                    </Button>
+                </Box>
+            );
+        }
+
+        if (selectedItem.type === 'page' && selectedItem.pageIndex !== null) {
+            const page = pages[selectedItem.pageIndex];
+            return (
+                <Box>
+                    <Typography variant="h6" gutterBottom>Page {page.page_number} Settings</Typography>
+                    <TextField label="Page Title (Optional)" fullWidth value={page.title} onChange={(e) => handlePageChange(selectedItem.pageIndex, 'title', e.target.value)} sx={{ mb: 3 }} />
+                    <Button variant="outlined" color="error" fullWidth startIcon={<DeleteIcon />} onClick={() => handleRemovePage(selectedItem.pageIndex)} disabled={pages.length === 1}>
+                        Delete Page
+                    </Button>
+                </Box>
+            );
+        }
+
+        if (selectedItem.type === 'question' && selectedItem.pageIndex !== null && selectedItem.qIndex !== null) {
+            const pIdx = selectedItem.pageIndex;
+            const qIdx = selectedItem.qIndex;
+            const question = pages[pIdx].questions[qIdx];
+
+            return (
+                <Box>
+                    <Typography variant="h6" gutterBottom>Edit Question</Typography>
+
+                    <TextField label="Question Text" fullWidth multiline rows={2} value={question.text} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'text', e.target.value)} sx={{ mb: 3 }} required />
+
+                    <FormControl fullWidth sx={{ mb: 3 }}>
+                        <InputLabel>Question Type</InputLabel>
+                        <Select value={question.question_type} label="Question Type" onChange={(e) => handleQuestionChange(pIdx, qIdx, 'question_type', e.target.value)}>
+                            <MenuItem value="single_choice">Single Choice</MenuItem>
+                            <MenuItem value="MULTIPLE_CHOICE">Multiple Choice</MenuItem>
+                            <MenuItem value="scale">Scale (1-N)</MenuItem>
+                            <MenuItem value="text_open">Open Text</MenuItem>
+                        </Select>
+                    </FormControl>
+
+                    <FormGroup sx={{ mb: 3 }}>
+                        <FormControlLabel control={<Switch checked={question.is_required} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'is_required', e.target.checked)} />} label="Required Question" />
+                    </FormGroup>
+
+                    <Divider sx={{ my: 2 }} />
+
+                    {/* Options Editor */}
+                    {(question.question_type === 'single_choice' || question.question_type === 'multiple_choice') && (
+                        <Box>
+                            <Typography variant="subtitle2" gutterBottom>Options</Typography>
+                            {question.options.map((opt, oIndex) => (
+                                <Box key={oIndex} sx={{ display: 'flex', mb: 1 }}>
+                                    <TextField size="small" fullWidth placeholder={`Option ${oIndex + 1}`} value={opt.text} onChange={(e) => handleOptionChange(pIdx, qIdx, oIndex, e.target.value)} sx={{ mr: 1 }} />
+                                    <IconButton size="small" color="error" onClick={() => handleRemoveOption(pIdx, qIdx, oIndex)}>
+                                        <DeleteIcon fontSize="small" />
+                                    </IconButton>
+                                </Box>
+                            ))}
+                            <Button size="small" startIcon={<AddCircleIcon />} onClick={() => handleAddOption(pIdx, qIdx)}>Add Option</Button>
+                        </Box>
+                    )}
+
+                    {/* Scale Editor */}
+                    {question.question_type === 'scale' && (
+                        <Grid container spacing={2}>
+                            <Grid item xs={6}>
+                                <TextField type="number" label="Min Value" size="small" fullWidth value={question.scale_min || ''} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'scale_min', parseInt(e.target.value))} />
+                            </Grid>
+                            <Grid item xs={6}>
+                                <TextField type="number" label="Max Value" size="small" fullWidth value={question.scale_max || ''} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'scale_max', parseInt(e.target.value))} />
+                            </Grid>
+                            <Grid item xs={6}>
+                                <TextField label="Min Label" size="small" fullWidth value={question.scale_min_label || ''} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'scale_min_label', e.target.value)} />
+                            </Grid>
+                            <Grid item xs={6}>
+                                <TextField label="Max Label" size="small" fullWidth value={question.scale_max_label || ''} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'scale_max_label', e.target.value)} />
+                            </Grid>
+                        </Grid>
+                    )}
+
+                    <Divider sx={{ my: 3 }} />
+                    <Button variant="outlined" color="error" fullWidth startIcon={<DeleteIcon />} onClick={() => handleRemoveQuestion(pIdx, qIdx)}>
+                        Delete Question
+                    </Button>
+                </Box>
+            );
+        }
+        return null;
+    };
 
     return (
-        <Box sx={{ maxWidth: 900, margin: '0 auto', pb: 8 }}>
-            <Paper elevation={2} sx={{ p: 4, mb: 4 }}>
-                <Typography variant="h4" gutterBottom>Create New Form</Typography>
+        <Box sx={{ display: 'flex', width: '100%', height: 'calc(100vh - 64px)', overflow: 'hidden' }}>
 
-                {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+            {/* ========================================== */}
+            {/* LEFT PANEL: The Settings Window            */}
+            {/* ========================================== */}
+            <Box sx={{
+                width: 350,
+                flexShrink: 0,
+                borderRight: '1px solid #e0e0e0',
+                backgroundColor: '#ffffff',
+                p: 3,
+                overflowY: 'auto',
+                boxShadow: '2px 0 5px rgba(0,0,0,0.05)',
+                zIndex: 10
+            }}>
+                {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+                {renderEditorPanel()}
+            </Box>
 
-                <Grid container spacing={3}>
-                    <Grid item xs={12}>
-                        <TextField
-                            label="Form Title"
-                            fullWidth
-                            variant="outlined"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            required
-                        />
-                    </Grid>
-                    <Grid item xs={12}>
-                        <TextField
-                            label="Description (Optional)"
-                            fullWidth
-                            variant="outlined"
-                            multiline
-                            rows={2}
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                        />
-                    </Grid>
-                    <Grid item xs={12}>
-                        <FormGroup>
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={isActive}
-                                        onChange={(e) => setIsActive(e.target.checked)}
-                                    />
-                                }
-                                label="Set as Active (Live)"
-                            />
-                        </FormGroup>
-                    </Grid>
-                </Grid>
-            </Paper>
+            {/* ========================================== */}
+            {/* MIDDLE PANEL: The Canvas View              */}
+            {/* ========================================== */}
+            <Box sx={{
+                flexGrow: 1,
+                backgroundColor: '#f4f6f8',
+                p: { xs: 2, md: 5 },
+                overflowY: 'auto',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center'
+            }}>
+                <Box sx={{ width: '100%', maxWidth: 800 }}>
 
-            {/* --- PAGES RENDER LOOP --- */}
-            {pages.map((page, pIndex) => (
-                <Card key={pIndex} sx={{ mb: 4, borderLeft: '4px solid #1976d2' }}>
-                    <CardContent>
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                            <Typography variant="h6">Page {page.page_number}</Typography>
-                            {pages.length > 1 && (
-                                <IconButton color="error" onClick={() => handleRemovePage(pIndex)}>
-                                    <DeleteIcon />
-                                </IconButton>
-                            )}
+                    {/* Header Canvas Block */}
+                    <Paper
+                        elevation={selectedItem.type === 'form' ? 4 : 1}
+                        onClick={() => setSelectedItem({ type: 'form', pageIndex: null, qIndex: null })}
+                        sx={{
+                            p: 4, mb: 4, cursor: 'pointer',
+                            borderTop: '8px solid #1976d2',
+                            outline: selectedItem.type === 'form' ? '2px solid #1976d2' : 'none'
+                        }}
+                    >
+                        <Typography variant="h3">{title || "Untitled Form"}</Typography>
+                        <Typography variant="body1" color="text.secondary" sx={{ mt: 1 }}>{description || "Form Description"}</Typography>
+                    </Paper>
+
+                    {/* Pages Canvas Loop */}
+                    {pages.map((page, pIndex) => (
+                        <Box key={pIndex} sx={{ mb: 6 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                                <Typography variant="h5" sx={{ flexGrow: 1, color: '#424242' }}>
+                                    Page {page.page_number}: {page.title}
+                                </Typography>
+                                <Button size="small" onClick={() => setSelectedItem({ type: 'page', pageIndex: pIndex, qIndex: null })}>
+                                    Page Settings
+                                </Button>
+                            </Box>
+
+                            {/* Questions Canvas Loop */}
+                            {page.questions.map((question, qIndex) => {
+                                const isSelected = selectedItem.type === 'question' && selectedItem.pageIndex === pIndex && selectedItem.qIndex === qIndex;
+                                return (
+                                    <Paper
+                                        key={qIndex}
+                                        elevation={isSelected ? 4 : 1}
+                                        onClick={() => setSelectedItem({ type: 'question', pageIndex: pIndex, qIndex: qIndex })}
+                                        sx={{
+                                            p: 3, mb: 2, cursor: 'pointer',
+                                            borderLeft: isSelected ? '4px solid #1976d2' : '4px solid transparent',
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                    >
+                                        <Typography variant="h6" gutterBottom>
+                                            {question.text || "Empty Question"}
+                                            {question.is_required && <span style={{ color: 'red' }}> *</span>}
+                                        </Typography>
+
+                                        {/* Visual Preview Placeholder */}
+                                        <Typography variant="body2" color="text.secondary" sx={{ fontStyle: 'italic', bgcolor: '#f0f0f0', p: 1, borderRadius: 1 }}>
+                                            [Preview: {question.question_type.replace('_', ' ')}]
+                                        </Typography>
+                                    </Paper>
+                                );
+                            })}
+
+                            {/* Canvas Actions */}
+                            <Button variant="outlined" sx={{ mt: 1 }} startIcon={<AddCircleIcon />} onClick={() => handleAddQuestion(pIndex)}>
+                                Add Question to Page {page.page_number}
+                            </Button>
                         </Box>
+                    ))}
 
-                        <TextField
-                            label="Page Title (Optional)"
-                            fullWidth
-                            size="small"
-                            sx={{ mb: 4 }}
-                            value={page.title}
-                            onChange={(e) => handlePageChange(pIndex, 'title', e.target.value)}
-                        />
-
-                        {/* --- QUESTIONS RENDER LOOP --- */}
-                        {page.questions.map((question, qIndex) => (
-                            <Paper variant="outlined" key={qIndex} sx={{ p: 3, mb: 3, backgroundColor: '#fafafa' }}>
-                                <Grid container spacing={2} alignItems="center">
-                                    <Grid item xs={8}>
-                                        <TextField
-                                            label={`Question ${qIndex + 1}`}
-                                            fullWidth
-                                            size="small"
-                                            value={question.text}
-                                            onChange={(e) => handleQuestionChange(pIndex, qIndex, 'text', e.target.value)}
-                                            required
-                                        />
-                                    </Grid>
-                                    <Grid item xs={3}>
-                                        <FormControl fullWidth size="small">
-                                            <InputLabel>Type</InputLabel>
-                                            <Select
-                                                value={question.question_type}
-                                                label="Type"
-                                                onChange={(e) => handleQuestionChange(pIndex, qIndex, 'question_type', e.target.value)}
-                                            >
-                                                <MenuItem value="single_choice">Single Choice</MenuItem>
-                                                <MenuItem value="multiple_choice">Multiple Choice</MenuItem>
-                                                <MenuItem value="scale">Scale (1-N)</MenuItem>
-                                                <MenuItem value="text_open">Open Text</MenuItem>
-                                            </Select>
-                                        </FormControl>
-                                    </Grid>
-                                    <Grid item xs={1}>
-                                        <IconButton color="error" onClick={() => handleRemoveQuestion(pIndex, qIndex)}>
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    </Grid>
-                                </Grid>
-
-                                {/* --- CONDITIONAL OPTIONS/SCALE RENDERING --- */}
-                                {(question.question_type === 'single_choice' || question.question_type === 'multiple_choice') && (
-                                    <Box sx={{ mt: 2, ml: 4 }}>
-                                        {question.options.map((opt, oIndex) => (
-                                            <Box key={oIndex} sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                                                <Typography variant="body2" sx={{ mr: 2, color: 'text.secondary' }}>
-                                                    {oIndex + 1}.
-                                                </Typography>
-                                                <TextField
-                                                    size="small"
-                                                    placeholder="Option text"
-                                                    value={opt.text}
-                                                    onChange={(e) => handleOptionChange(pIndex, qIndex, oIndex, e.target.value)}
-                                                    sx={{ mr: 1, flexGrow: 1 }}
-                                                />
-                                                <IconButton size="small" color="error" onClick={() => handleRemoveOption(pIndex, qIndex, oIndex)}>
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            </Box>
-                                        ))}
-                                        <Button size="small" startIcon={<AddCircleIcon />} onClick={() => handleAddOption(pIndex, qIndex)}>
-                                            Add Option
-                                        </Button>
-                                    </Box>
-                                )}
-
-                                {question.question_type === 'scale' && (
-                                    <Grid container spacing={2} sx={{ mt: 1, ml: 2, width: 'calc(100% - 16px)' }}>
-                                        <Grid item xs={6} sm={3}>
-                                            <TextField type="number" label="Min Value" size="small" fullWidth
-                                                       value={question.scale_min || ''}
-                                                       onChange={(e) => handleQuestionChange(pIndex, qIndex, 'scale_min', parseInt(e.target.value))} />
-                                        </Grid>
-                                        <Grid item xs={6} sm={3}>
-                                            <TextField type="number" label="Max Value" size="small" fullWidth
-                                                       value={question.scale_max || ''}
-                                                       onChange={(e) => handleQuestionChange(pIndex, qIndex, 'scale_max', parseInt(e.target.value))} />
-                                        </Grid>
-                                    </Grid>
-                                )}
-                            </Paper>
-                        ))}
-
-                        <Button variant="outlined" startIcon={<AddCircleIcon />} onClick={() => handleAddQuestion(pIndex)}>
-                            Add Question
-                        </Button>
-                    </CardContent>
-                </Card>
-            ))}
-
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                <Button variant="text" onClick={handleAddPage}>+ Add Another Page</Button>
-                <Button
-                    variant="contained"
-                    color="primary"
-                    size="large"
-                    onClick={handleSubmit}
-                    disabled={isSubmitting}
-                >
-                    {isSubmitting ? 'Saving...' : 'Save Complete Form'}
-                </Button>
+                    <Divider sx={{ my: 4 }} />
+                    <Button variant="text" size="large" onClick={handleAddPage}>
+                        + Add New Page
+                    </Button>
+                </Box>
             </Box>
         </Box>
     );

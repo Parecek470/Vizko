@@ -13,7 +13,7 @@ function App() {
         <CssBaseline />
 
         {/* Box is an MUI component that acts like a <div> but handles styling beautifully */}
-        <Box sx={{ display: 'flex', height: '100vh', backgroundColor: '#f5f5f5' }}>
+        <Box sx={{ display: 'flex',width:'100vw', height: '100vh', backgroundColor: '#f5f5f5' }}>
 
           {/* Left Side: The Navigation List */}
           <Sidebar />

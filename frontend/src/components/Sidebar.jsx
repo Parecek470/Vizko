@@ -46,7 +46,7 @@ export default function Sidebar() {
     return (
         <Box
             sx={{
-                width: 280,
+                width: '10vh',
                 backgroundColor: '#ffffff',
                 borderRight: '1px solid #e0e0e0',
                 display: 'flex',
