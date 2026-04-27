@@ -13,35 +13,15 @@ import {
     CircularProgress
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
+import { useForms } from '../context/FormContext';
 
 export default function Sidebar() {
-    const [forms, setForms] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const { forms, loading } = useForms();
 
     // React Router hooks for navigation
     const navigate = useNavigate();
     const location = useLocation();
 
-    // Fetch the lightweight summary data from our FastAPI route
-    useEffect(() => {
-        const fetchForms = async () => {
-            try {
-                const response = await fetch('http://localhost:8000/forms/');
-                if (response.ok) {
-                    const data = await response.json();
-                    setForms(data);
-                } else {
-                    console.error("Failed to fetch forms");
-                }
-            } catch (error) {
-                console.error("Network error:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchForms();
-    }, []); // The empty array means this runs exactly once when the component mounts
 
     return (
         <Box

@@ -12,6 +12,7 @@ services:
       # Maps a local folder called 'sqlite_data' to the container.
       # This ensures your thesis data isn't wiped if the container restarts.
       - ./sqlite_data:/app/data
+      - ./backend:/app
     restart: unless-stopped
 
   frontend:

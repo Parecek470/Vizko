@@ -9,6 +9,7 @@ import {
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import SettingsIcon from '@mui/icons-material/Settings';
+import { useForms } from '../context/FormContext';
 
 export default function FormBuilder() {
     const navigate = useNavigate();
@@ -17,6 +18,7 @@ export default function FormBuilder() {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [isActive, setIsActive] = useState(false);
+    const {refreshForms} = useForms();
 
     const [pages, setPages] = useState([{
         page_number: 1,
@@ -130,6 +132,7 @@ export default function FormBuilder() {
 
             if (response.ok) {
                 const newForm = await response.json();
+                await refreshForms();
                 navigate(`/forms/${newForm.id}`);
             } else {
                 const errorData = await response.json();

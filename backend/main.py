@@ -111,3 +111,32 @@ def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db)):
 
 
     return db_form
+
+# Add to backend/main.py
+
+@app.put("/forms/{form_id}", response_model=schemas.FormSummaryResponse)
+def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Session = Depends(get_db)):
+    """Updates top-level form metadata."""
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    
+    # Update only metadata
+    form.title = form_update.title
+    form.description = form_update.description
+    form.is_active = form_update.is_active
+    
+    db.commit()
+    db.refresh(form)
+    return form
+
+@app.delete("/forms/{form_id}", status_code=204)
+def delete_form(form_id: int, db: Session = Depends(get_db)):
+    """Deletes a form. Cascading deletes will handle pages/questions/answers."""
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+        
+    db.delete(form)
+    db.commit()
+    return None
