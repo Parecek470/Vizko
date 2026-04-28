@@ -3,6 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from typing import List
+from sqlalchemy import func
 
 
 
@@ -140,3 +141,123 @@ def delete_form(form_id: int, db: Session = Depends(get_db)):
     db.delete(form)
     db.commit()
     return None
+
+# Respondents calls
+
+@app.get("/join/{join_code}", response_model=schemas.FormDetailResponse)
+def get_form_by_join_code(join_code: str, db: Session = Depends(get_db)):
+    """Fetches a form by its join code."""
+    form = db.query(models.Form).filter(models.Form.join_code == join_code).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found with this code.")
+    
+    if not form.is_active:
+        raise HTTPException(status_code=403, detail="Form is not currently accepting responses.")
+    
+    return form
+
+@app.post("/forms/{form_id}/submissions", status_code=201)
+def submit_form_answers(form_id: int, submission: schemas.SubmissionCreate, db: Session = Depends(get_db)):
+    """Submits answers for a specific form."""
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form or not form.is_active:
+        raise HTTPException(status_code=400, detail="Invalid or incactive form.")
+
+    db_submission = models.FormSubmission(form_id = form.id)
+    db.add(db_submission)
+    db.flush()
+
+    for ans_in in submission.answers:
+        db_answer=models.Answer(
+            submission_id=db_submission.id,
+            question_id=ans_in.question_id,
+            text_value=ans_in.text_value,
+            scale_value=ans_in.scale_value
+        )
+        db.add(db_answer)
+        db.flush()
+
+        if ans_in.selected_option_ids:
+            options = db.query(models.QuestionOption).filter(
+                models.QuestionOption.id.in_(ans_in.selected_option_ids)
+            ).all()
+            db_answer.selected_options.extend(options)
+    
+    db.commit()
+    return {"message": "Submission successful."}
+
+@app.get("/forms/{form_id}/analytics/questions/{question_id}", response_model=schemas.QuestionAnalyticsResponse)
+def get_question_analytics(form_id: int, question_id: int, db: Session = Depends(get_db)):
+    """Aggregates answer data for a specific question to feed the visualization UI."""
+    
+    # 1. Verify the question exists and belongs to the form
+    question = db.query(models.Question).filter(
+        models.Question.id == question_id,
+        models.Question.form_id == form_id
+    ).first()
+    
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    response_data = {
+        "question_id": question.id,
+        "question_type": question.question_type,
+    }
+
+    # 2. Handle TEXT questions (Return list of strings)
+    if question.question_type == "text_open":
+        # Pluck just the text_value column from Answers
+        answers = db.query(models.Answer.text_value).filter(
+            models.Answer.question_id == question.id,
+            models.Answer.text_value.isnot(None),
+            models.Answer.text_value != ""
+        ).all()
+        # answers is a list of tuples like [("Great class",), ("Needs more math",)]
+        response_data["responses"] = [ans[0] for ans in answers]
+
+    # 3. Handle CHOICE questions (Single and Multiple)
+    elif question.question_type in ["single_choice", "multiple_choice"]:
+        # Query QuestionOption, and outerjoin with answer_options_table
+        # This groups by the option ID and counts the number of related answers
+        distribution = db.query(
+            models.QuestionOption.text.label('name'),
+            func.count(models.answer_options_table.c.answer_id).label('count')
+        ).outerjoin(
+            models.answer_options_table,
+            models.QuestionOption.id == models.answer_options_table.c.option_id
+        ).filter(
+            models.QuestionOption.question_id == question.id
+        ).group_by(
+            models.QuestionOption.id
+        ).all()
+        
+        response_data["distribution"] = [{"name": row.name, "count": row.count} for row in distribution]
+
+    # 4. Handle SCALE questions (Histograms from min to max)
+    elif question.question_type == "scale":
+        # Group answers by their scale_value
+        raw_counts = db.query(
+            models.Answer.scale_value,
+            func.count(models.Answer.id).label('count')
+        ).filter(
+            models.Answer.question_id == question.id,
+            models.Answer.scale_value.isnot(None)
+        ).group_by(
+            models.Answer.scale_value
+        ).all()
+        
+        # Convert to dictionary for easy lookup: { 1: 5, 2: 12, ... }
+        counts_dict = {row.scale_value: row.count for row in raw_counts}
+        
+        # Ensure we send back an entry for EVERY scale step, even if it has 0 votes.
+        # This keeps the X-axis of our Recharts histogram consistent and accurate.
+        distribution = []
+        for val in range(question.scale_min, question.scale_max + 1):
+            distribution.append({
+                "name": str(val), 
+                "count": counts_dict.get(val, 0)
+            })
+            
+        response_data["distribution"] = distribution
+
+    return response_data

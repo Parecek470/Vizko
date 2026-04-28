@@ -126,3 +126,13 @@ class SubmissionResponse(BaseModel):
     answers: List[AnswerResponse]
 
     model_config = ConfigDict(from_attributes=True)
+
+class AnalyticsDistributionItem(BaseModel):
+    name: str  # The option text or the scale number
+    count: int # How many people chose it
+
+class QuestionAnalyticsResponse(BaseModel):
+    question_id: int
+    question_type: str
+    responses: Optional[List[str]] = None  # For text_open questions
+    distribution: Optional[List[AnalyticsDistributionItem]] = None  # For charts

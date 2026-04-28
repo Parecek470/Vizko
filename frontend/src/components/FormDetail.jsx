@@ -57,7 +57,7 @@ export default function FormDetail() {
                 </Typography>
 
                 <Box sx={{ mt: 4, display: 'flex', gap: 2 }}>
-                    <Button variant="contained" color="primary">
+                    <Button variant="contained" color="secondary" onClick={()=>navigate(`/forms/${id}/analytics`)}>
                         View Analytics Dashboard
                     </Button>
                     <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDelete}>

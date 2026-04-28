@@ -5,7 +5,7 @@ import { ExpandLess, ExpandMore } from '@mui/icons-material';
 import QuestionVisualizer from './QuestionVisualizer';
 
 export default function AnalyticsDashboard() {
-    const { formId } = useParams();
+    const { id } = useParams();
     const [form, setForm] = useState(null);
     const [selectedQuestion, setSelectedQuestion] = useState(null);
 
@@ -15,7 +15,7 @@ export default function AnalyticsDashboard() {
     // Fetch the form structure (and later, the analytics payload)
     useEffect(() => {
         const fetchForm = async () => {
-            const res = await fetch(`http://localhost:8000/forms/${formId}`);
+            const res = await fetch(`http://localhost:8000/forms/${id}`);
             if (res.ok) {
                 const data = await res.json();
                 setForm(data);
@@ -26,7 +26,7 @@ export default function AnalyticsDashboard() {
             }
         };
         fetchForm();
-    }, [formId]);
+    }, [id]);
 
     const togglePage = (pageId) => {
         setOpenPages(prev => ({ ...prev, [pageId]: !prev[pageId] }));

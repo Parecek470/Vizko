@@ -9,6 +9,7 @@ import FormBuilder from './components/FormBuilder';
 import FormDetail from './components/FormDetail';
 import Join from './components/Join';
 import StudentFormViewer from "./components/StudentFormViewer";
+import AnalyticsDashboard from './components/analytics/AnalyticsDashboard.jsx';
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
                     <Route path="/forms/:id" element={<FormDetail />} />
                     <Route path="/join" element={<Join />}/>
                     <Route path="/respond/:code" element={<StudentFormViewer />} />
+                    <Route paht="/forms/:formId/analytics" element={<AnalyticsDashboard />} />
                   </Routes>
                 </Box>
               </Box>
