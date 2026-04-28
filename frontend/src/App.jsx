@@ -37,7 +37,7 @@ function App() {
                     <Route path="/forms/:id" element={<FormDetail />} />
                     <Route path="/join" element={<Join />}/>
                     <Route path="/respond/:code" element={<StudentFormViewer />} />
-                    <Route paht="/forms/:formId/analytics" element={<AnalyticsDashboard />} />
+                    <Route path="/forms/:id/analytics" element={<AnalyticsDashboard />} />
                   </Routes>
                 </Box>
               </Box>

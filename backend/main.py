@@ -191,9 +191,9 @@ def get_question_analytics(form_id: int, question_id: int, db: Session = Depends
     """Aggregates answer data for a specific question to feed the visualization UI."""
     
     # 1. Verify the question exists and belongs to the form
-    question = db.query(models.Question).filter(
+    question = db.query(models.Question).join(models.Page).filter(
         models.Question.id == question_id,
-        models.Question.form_id == form_id
+        models.Page.form_id == form_id
     ).first()
     
     if not question:
