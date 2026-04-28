@@ -1,74 +1,73 @@
 import { useState, useEffect } from 'react';
-import { Box, Typography, Paper, Card, CardContent } from '@mui/material';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Box, Typography, Paper, ToggleButton, ToggleButtonGroup, CircularProgress } from '@mui/material';
+import ChartSwitcher from './charts/ChartSwitcher';
+import { BarChart, PieChart, ShowChart, ScatterPlot } from '@mui/icons-material';
 
 export default function QuestionVisualizer({ formId, question }) {
-    const [chartData, setChartData] = useState([]);
-    const [textResponses, setTextResponses] = useState([]);
+    // rawData will store an array like: [1, 1, 2, 4, 5] or ["Option A", "Option A", "Option B"]
+    const [rawData, setRawData] = useState([]);
     const [loading, setLoading] = useState(true);
 
+    const defaultView = question.question_type === 'scale' ? 'histogram' :
+        question.question_type === 'text_open' ? 'text' : 'pie';
+    const [viewMode, setViewMode] = useState(defaultView);
+
     useEffect(() => {
-        // TODO: In the next step, we need to build this backend endpoint.
-        // For now, this is how the component expects the data to arrive.
-        const fetchAnalytics = async () => {
+        const fetchRawAnalytics = async () => {
             setLoading(true);
             try {
-                // Example: GET /forms/1/analytics/questions/5
-                const res = await fetch(`http://localhost:8000/forms/${formId}/analytics/questions/${question.id}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (question.question_type === 'text_open') {
-                        setTextResponses(data.responses); // Expecting an array of strings
-                    } else {
-                        setChartData(data.distribution); // Expecting [{ name: 'Option A', count: 12 }, ...]
-                    }
-                }
-            } catch (err) {
-                console.error("Failed to fetch analytics", err);
+                // Call the new universal raw-answers endpoint
+                const response = await fetch(
+                    `http://localhost:8000/forms/${formId}/analytics/raw-answers?q=${question.id}`
+                );
+                const json = await response.json();
+
+                // Extract the specific array for this question ID.
+                // Default to an empty array if nobody has answered yet.
+                const questionDataArray = json.data[question.id.toString()] || [];
+                setRawData(questionDataArray);
+            } catch (error) {
+                console.error("Failed to fetch analytics", error);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
 
-        fetchAnalytics();
-    }, [formId, question.id, question.question_type]);
+        fetchRawAnalytics();
+        setViewMode(defaultView);
+    }, [formId, question]);
 
-    if (loading) return <Typography>Loading chart data...</Typography>;
+    if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
     return (
         <Paper sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Typography variant="h5" gutterBottom>{question.text}</Typography>
-            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 4, textTransform: 'capitalize' }}>
-                Question Type: {question.question_type.replace('_', ' ')}
-            </Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+                <Box>
+                    <Typography variant="h5">{question.text}</Typography>
+                    <Typography variant="subtitle2" color="text.secondary">
+                        n = {rawData.length} responses
+                    </Typography>
+                </Box>
 
-            <Box sx={{ flexGrow: 1, minHeight: 400 }}>
-                {/* RENDER HISTOGRAM FOR DATA QUESTIONS */}
-                {['single_choice', 'multiple_choice', 'scale'].includes(question.question_type) && (
-                    <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis allowDecimals={false} />
-                            <Tooltip />
-                            <Bar dataKey="count" fill="#1976d2" radius={[4, 4, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
+                {question.question_type === 'scale' && (
+                    <ToggleButtonGroup size="small" value={viewMode} exclusive onChange={(e, val) => val && setViewMode(val)}>
+                        <ToggleButton value="histogram"><BarChart sx={{mr: 1}}/> Hist</ToggleButton>
+                        <ToggleButton value="box"><ShowChart sx={{mr: 1}}/> Box</ToggleButton>
+                        <ToggleButton value="violin">Violin</ToggleButton>
+                    </ToggleButtonGroup>
                 )}
 
-                {/* RENDER TEXT CARDS FOR OPEN QUESTIONS */}
-                {question.question_type === 'text_open' && (
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {textResponses.length > 0 ? textResponses.map((text, idx) => (
-                            <Card key={idx} variant="outlined" sx={{ bgcolor: '#fafafa' }}>
-                                <CardContent>
-                                    <Typography variant="body1">{text}</Typography>
-                                </CardContent>
-                            </Card>
-                        )) : (
-                            <Typography color="text.secondary">No text responses yet.</Typography>
-                        )}
-                    </Box>
-                )}
+                {/* ... other toggle buttons ... */}
+            </Box>
+
+            <Box sx={{ flexGrow: 1, minHeight: '300px' }}>
+                {/* Pass the RAW array down to the switcher */}
+                <ChartSwitcher
+                    type={question.question_type}
+                    mode={viewMode}
+                    data={rawData}
+                    question={question} // Pass the question object for min/max labels!
+                />
             </Box>
         </Paper>
     );
