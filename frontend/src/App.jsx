@@ -7,6 +7,8 @@ import Topbar from './components/Topbar';
 import Sidebar from './components/Sidebar';
 import FormBuilder from './components/FormBuilder';
 import FormDetail from './components/FormDetail';
+import Join from './components/Join';
+import StudentFormViewer from "./components/StudentFormViewer";
 
 function App() {
   return (
@@ -32,6 +34,8 @@ function App() {
                     <Route path="/" element={<FormBuilder />} />
                     <Route path="/create" element={<FormBuilder />} />
                     <Route path="/forms/:id" element={<FormDetail />} />
+                    <Route path="/join" element={<Join />}/>
+                    <Route path="/respond/:code" element={<StudentFormViewer />} />
                   </Routes>
                 </Box>
               </Box>
