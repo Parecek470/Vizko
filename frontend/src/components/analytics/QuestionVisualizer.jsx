@@ -90,6 +90,13 @@ export default function QuestionVisualizer({ formId, question, groupByQuestionId
                     </ToggleButtonGroup>
                 )}
 
+                {(question.question_type === 'single_choice' || question.question_type === 'multiple_choice') && (
+                    <ToggleButtonGroup size="small" value={viewMode} exclusive onChange={(e, val) => val && setViewMode(val)}>
+                        <ToggleButton value="pie"><BarChart sx={{mr: 1}}/> Hist</ToggleButton>
+                        <ToggleButton value="histogram"><ShowChart sx={{mr: 1}}/> Box</ToggleButton>
+                    </ToggleButtonGroup>
+                )}
+
                 {/* ... other toggle buttons ... */}
             </Box>
 

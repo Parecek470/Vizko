@@ -10,13 +10,16 @@ export default function ScaleVisualizer({ mode, data, question }) {
         return <div>No responses yet.</div>;
     }
 
+    const scaleMin = Number.isFinite(question?.scale_min) ? question.scale_min : 1;
+    const scaleMax = Number.isFinite(question?.scale_max) ? question.scale_max : 5;
+
     // Common layout configuration for all scale plots
     const layout = {
         autosize: true,
         margin: { l: 50, r: 20, t: 20, b: 50 },
         xaxis: {
             title: 'Scale Value',
-            range: [question.scale_min - 0.5, question.scale_max + 0.5],
+            range: [scaleMin - 0.5, scaleMax + 0.5],
             dtick: 1
         },
         yaxis: {

@@ -1,7 +1,6 @@
 import React from 'react';
 import PlotlyComponent from 'react-plotly.js';
 
-// Vite CommonJS Interop Fix: Unwrap the default export if Vite bundled it as an object
 const Plot = PlotlyComponent.default || PlotlyComponent;
 
 export default function ChoiceVisualizer({ mode, data }) {
@@ -9,60 +8,28 @@ export default function ChoiceVisualizer({ mode, data }) {
         return <div>No responses yet.</div>;
     }
 
-    // 1. DEFENSIVE CHECK: Detect if we are receiving the old aggregated objects
-    // Old format: [{ name: "Math", count: 2 }]
-    // New format: ["Math", "Math"]
-    const isOldFormat = typeof data[0] === 'object' && data[0] !== null;
+    const layout = { autosize: true, margin: { l: 50, r: 50, t: 20, b: 50 } };
+    const config = { responsive: true, displayModeBar: false };
+    const colors = ['#1976d2', '#dc004e', '#388e3c', '#f57c00', '#9c27b0'];
 
-    // 2. NORMALIZE THE DATA
-    let pieLabels = [];
-    let pieValues = [];
-    let histogramData = []; // Plotly needs a flat array for histograms
+    // Flatten one series' data into raw strings, expanding any multi-select arrays.
+    const flatten = (arr) => arr.flatMap(v => Array.isArray(v) ? v : [v]);
 
-    if (isOldFormat) {
-        // --- Handle Old API Format ---
-        pieLabels = data.map(item => item.name);
-        pieValues = data.map(item => item.count);
-
-        // "Un-aggregate" the objects back into a raw string array for the histogram
-        data.forEach(item => {
-            for (let i = 0; i < item.count; i++) {
-                histogramData.push(item.name);
-            }
-        });
-    } else {
-        // --- Handle New Raw API Format ---
-        histogramData = data;
-
-        // Manually aggregate for the Pie Chart
-        const counts = data.reduce((acc, val) => {
+    if (mode === 'pie') {
+        // Aggregate across all series for a single pie.
+        const all = data.flatMap(s => flatten(s.data || []));
+        const counts = all.reduce((acc, val) => {
             acc[val] = (acc[val] || 0) + 1;
             return acc;
         }, {});
-
-        pieLabels = Object.keys(counts);
-        pieValues = Object.values(counts);
-    }
-
-    // 3. RENDER THE CHARTS
-    const layout = {
-        autosize: true,
-        margin: { l: 50, r: 50, t: 20, b: 50 },
-    };
-
-    const config = { responsive: true, displayModeBar: false };
-
-    if (mode === 'pie') {
         return (
             <Plot
                 data={[{
                     type: 'pie',
-                    labels: pieLabels,
-                    values: pieValues,
+                    labels: Object.keys(counts),
+                    values: Object.values(counts),
                     hole: 0.4,
-                    marker: {
-                        colors: ['#1976d2', '#dc004e', '#388e3c', '#f57c00', '#9c27b0']
-                    }
+                    marker: { colors },
                 }]}
                 layout={layout}
                 config={config}
@@ -72,17 +39,23 @@ export default function ChoiceVisualizer({ mode, data }) {
     }
 
     if (mode === 'histogram') {
+        // One histogram trace per series for grouped views.
+        const traces = data.map((s, i) => ({
+            type: 'histogram',
+            name: s.name,
+            x: flatten(s.data || []),
+            marker: { color: colors[i % colors.length] },
+            opacity: data.length > 1 ? 0.7 : 1,
+        }));
         return (
             <Plot
-                data={[{
-                    type: 'histogram',
-                    x: histogramData, // Now guaranteed to be an array of strings!
-                    marker: { color: '#1976d2' }
-                }]}
+                data={traces}
                 layout={{
                     ...layout,
+                    barmode: 'group',
                     yaxis: { title: 'Count' },
-                    xaxis: { title: 'Selected Options' }
+                    xaxis: { title: 'Selected Options' },
+                    showlegend: data.length > 1,
                 }}
                 config={config}
                 style={{ width: '100%', height: '100%' }}
