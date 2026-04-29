@@ -125,7 +125,7 @@ export default function FormBuilder() {
         const payload = { title, description, is_active: isActive, pages };
 
         try {
-            const response = await apiFetch('http://localhost:8000/forms/', {
+            const response = await apiFetch('http://10.0.1.53:8000/forms/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),

@@ -16,7 +16,7 @@ export default function FormDetail() {
     useEffect(() => {
         const fetchFormDetail = async () => {
             try {
-                const res = await apiFetch(`http://localhost:8000/forms/${id}`);
+                const res = await apiFetch(`http://10.0.1.53:8000/forms/${id}`);
                 if (res.ok) setForm(await res.json());
             } catch (err) {
                 console.error("Error fetching form:", err);
@@ -30,7 +30,7 @@ export default function FormDetail() {
     const handleDelete = async () => {
         if (!window.confirm("Are you sure you want to delete this form and all its responses?")) return;
 
-        await apiFetch(`http://localhost:8000/forms/${id}`, { method: 'DELETE' });
+        await apiFetch(`http://10.0.1.53:8000/forms/${id}`, { method: 'DELETE' });
         await refreshForms(); // Update sidebar
         navigate('/create'); // Send back to home
     };

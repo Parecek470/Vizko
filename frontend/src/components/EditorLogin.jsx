@@ -16,7 +16,7 @@ export default function EditorLogin() {
 
         try {
             // 2. Test the credentials by hitting the locked /forms/ route
-            const res = await fetch('http://localhost:8000/forms/', {
+            const res = await fetch('http://10.0.1.53:8000/forms/', {
                 headers: {
                     'Authorization': `Basic ${token}`
                 }

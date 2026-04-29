@@ -11,6 +11,16 @@ export default function Topbar({ isTeacherView }) {
                 </Typography>
 
                 {/* Only render the Teacher Access button if we are on a student layout */}
+                {isTeacherView && (
+                    <Button
+                    color="inherit"
+                    component={RouterLink}
+                    to="/"
+                    sx={{ fontWeight: 'bold' }}
+                    >
+                        Student Access
+                        </Button>
+                )}
                 {!isTeacherView && (
                     <Button
                         color="inherit"

@@ -10,7 +10,7 @@ export default function Join() {
     const handleJoin = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`http://localhost:8000/join/${code}`);
+            const res = await fetch(`http://10.0.1.53:8000/join/${code}`);
             if (res.ok) {
                 navigate(`/respond/${code}`);
             } else {
