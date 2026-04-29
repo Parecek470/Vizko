@@ -40,6 +40,17 @@ const TeacherLayout = () => {
   );
 };
 
+const AnalyticsLayout = () => {
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: '#f5f5f5' }}>
+            <Topbar isTeacherView={true} />
+            <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
+                <Outlet /> {/* Child routes will render here */}
+            </Box>
+        </Box>
+    )
+}
+
 // --- MAIN APP COMPONENT ---
 
 function App() {
@@ -61,6 +72,9 @@ function App() {
             <Route element={<TeacherLayout />}>
               <Route path="/create" element={<FormBuilder />} />
               <Route path="/forms/:id" element={<FormDetail />} />
+            </Route>
+
+            <Route element={<AnalyticsLayout />}>
               <Route path="/forms/:id/analytics" element={<AnalyticsDashboard />} />
             </Route>
 

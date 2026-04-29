@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from enum import Enum
 from datetime import datetime
 from constants import QuestionType
@@ -85,6 +85,7 @@ class FormDetailResponse(BaseModel):
     description: Optional[str]
     is_active: bool
     join_code: str
+    response_count: int
     pages: List[PageResponse]
     model_config = ConfigDict(from_attributes=True)
 
@@ -136,3 +137,6 @@ class QuestionAnalyticsResponse(BaseModel):
     question_type: str
     responses: Optional[List[str]] = None  # For text_open questions
     distribution: Optional[List[AnalyticsDistributionItem]] = None  # For charts
+
+class RawAnswersResponse(BaseModel):
+    data: Dict[str, List[Any]]

@@ -1,9 +1,23 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { Box, List, ListItemButton, ListItemText, Collapse, Typography, Paper, Divider } from '@mui/material';
+import {
+    Box,
+    List,
+    ListItemButton,
+    ListItemText,
+    Collapse,
+    Typography,
+    Paper,
+    Divider,
+    Breadcrumbs,
+    Link,
+} from '@mui/material';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
 import QuestionVisualizer from './QuestionVisualizer';
 import {apiFetch} from "../../utils/api.js";
+import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
+import { Link as RouterLink } from 'react-router-dom';
+
 
 export default function AnalyticsDashboard() {
     const { id } = useParams();
@@ -38,15 +52,43 @@ export default function AnalyticsDashboard() {
         setOpenPages(prev => ({ ...prev, [pageId]: !prev[pageId] }));
     };
 
+
     // 3. Display error if one occurs
     if (error) return <Typography sx={{ p: 4, color: 'error.main' }}>{error}</Typography>;
     if (!form) return <Typography sx={{ p: 4 }}>Loading analytics...</Typography>;
 
     return (
         <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
-            <Paper elevation={2} sx={{ width: 300, overflowY: 'auto', borderRadius: 0 }}>
+            <Paper elevation={2} sx={{ width: '20vh', overflowY: 'auto', borderRadius: 0 }}>
                 <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white' }}>
-                    <Typography variant="h6">Form Structure</Typography>
+
+                        <Link
+                            component={RouterLink}
+                            to={`/forms/${id}`}
+                            underline="none"
+                            color="textDisabled"
+                            sx={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.5,
+                                mb: 2,
+                                px: 2,
+                                py: 0.5,
+                                fontWeight: 600,
+                                bgcolor: "rgba(255, 255, 255, 0.1)",
+                                borderRadius: 1,
+                                '&:hover': {
+                                    color: 'white',
+                                    textDecoration: 'none',
+                                },
+                            }}
+                        >
+                            <NavigateBeforeIcon fontSize="small" />
+                             Forms List
+                        </Link>
+
+                    <Typography variant="h6">{form?.title || 'Form Analytics'}</Typography>
+                    <Typography variant="subtitle1" color="text.secondary">Responses: {form.response_count}</Typography>
                 </Box>
                 <List component="nav">
                     {/* 4. Add Optional Chaining (?.) to pages array */}

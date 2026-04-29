@@ -1,9 +1,12 @@
 # backend/main.py
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from typing import List
 from sqlalchemy import func
+import secrets
+import os
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
 
 
@@ -13,6 +16,30 @@ import models
 import schemas
 from database import engine, SessionLocal
 import utils
+
+
+#security
+security = HTTPBasic()
+
+TEACHER_ACCOUNTS = {
+    "test": os.getenv("TEST_TEACHER_PASSWORD", "fall1")
+}
+
+def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
+    if credentials.username not in TEACHER_ACCOUNTS:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    
+    if not secrets.compare_digest(credentials.password, TEACHER_ACCOUNTS[credentials.username]):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
 
 # 1. Instruct SQLAlchemy to create the tables in SQLite if they don't exist
 models.Base.metadata.create_all(bind=engine)
@@ -38,7 +65,7 @@ def get_db():
 # 1. THE LIST ROUTE (For the Sidebar)
 # Notice we use List[schemas.FormSummaryResponse] to keep the data light.
 @app.get("/forms/", response_model=List[schemas.FormSummaryResponse])
-def get_all_forms(db: Session = Depends(get_db)):
+def get_all_forms(db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Fetches a lightweight list of all forms."""
     forms = db.query(models.Form).all()
     return forms
@@ -46,7 +73,7 @@ def get_all_forms(db: Session = Depends(get_db)):
 # 2. THE DETAIL ROUTE (For the Main Dashboard View)
 # We put {form_id} in the URL so React can ask for a specific one.
 @app.get("/forms/{form_id}", response_model=schemas.FormDetailResponse)
-def get_form_detail(form_id: int, db: Session = Depends(get_db)):
+def get_form_detail(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Fetches the complete, deeply nested data for a single form."""
     
     # .first() gets the single item, or returns None if it doesn't exist
@@ -58,7 +85,7 @@ def get_form_detail(form_id: int, db: Session = Depends(get_db)):
     return form
 
 @app.post("/forms/", response_model=schemas.FormDetailResponse)
-def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db)):
+def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Creates a new form."""
     unique_code = utils.get_unique_join_code(db)
 
@@ -116,7 +143,7 @@ def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db)):
 # Add to backend/main.py
 
 @app.put("/forms/{form_id}", response_model=schemas.FormSummaryResponse)
-def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Session = Depends(get_db)):
+def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Updates top-level form metadata."""
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
@@ -132,7 +159,7 @@ def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Sessio
     return form
 
 @app.delete("/forms/{form_id}", status_code=204)
-def delete_form(form_id: int, db: Session = Depends(get_db)):
+def delete_form(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Deletes a form. Cascading deletes will handle pages/questions/answers."""
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
@@ -187,7 +214,7 @@ def submit_form_answers(form_id: int, submission: schemas.SubmissionCreate, db: 
     return {"message": "Submission successful."}
 
 @app.get("/forms/{form_id}/analytics/questions/{question_id}", response_model=schemas.QuestionAnalyticsResponse)
-def get_question_analytics(form_id: int, question_id: int, db: Session = Depends(get_db)):
+def get_question_analytics(form_id: int, question_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Aggregates answer data for a specific question to feed the visualization UI."""
     
     # 1. Verify the question exists and belongs to the form
@@ -261,3 +288,24 @@ def get_question_analytics(form_id: int, question_id: int, db: Session = Depends
         response_data["distribution"] = distribution
 
     return response_data
+
+@app.get("/forms/{form_id}/analytics/raw-answers", response_model=schemas.RawAnswersResponse)
+def get_raw_answers(form_id: int, q: List[int] = Query(...), db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """Fetches raw answer data for a specific question/questions."""
+    raw_answers = db.query(models.Answer).join(models.FormSubmission).filter(
+        models.FormSubmission.form_id == form_id,
+        models.Answer.question_id.in_(q)
+    ).options(joinedload(models.Answer.selected_options)).all()
+
+    result_data = {str(qid): [] for qid in q}
+    
+    for ans in raw_answers:
+        if ans.scale_value is not None:
+            result_data[str(ans.question_id)].append(ans.scale_value)
+        elif ans.text_value is not None and ans.text_value.strip() != "":
+            result_data[str(ans.question_id)].append(ans.text_value)
+        elif ans.selected_options:
+            for option in ans.selected_options:
+                result_data[str(ans.question_id)].append(option.text)
+
+    return {"data": result_data}
