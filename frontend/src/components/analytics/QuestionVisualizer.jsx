@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Paper, ToggleButton, ToggleButtonGroup, CircularProgress } from '@mui/material';
 import ChartSwitcher from './charts/ChartSwitcher';
-import { BarChart, PieChart, ShowChart, ScatterPlot } from '@mui/icons-material';
+import KdeSettings from './charts/KdeSettings';
+import { BarChart, ShowChart } from '@mui/icons-material';
 import { apiFetch } from '../../utils/api';
 
 export default function QuestionVisualizer({ formId, question, groupByQuestionId }) {
@@ -13,6 +14,10 @@ export default function QuestionVisualizer({ formId, question, groupByQuestionId
     const defaultView = question.question_type === 'scale' ? 'histogram' :
         question.question_type === 'text_open' ? 'text' : 'pie';
     const [viewMode, setViewMode] = useState(defaultView);
+
+    // KDE state — bandwidth is auto-set via Silverman's rule when data loads
+    const [kdeEnabled, setKdeEnabled] = useState(false);
+    const [kdeBandwidth, setKdeBandwidth] = useState(0.5);
 
     useEffect(() => {
         const fetchRawAnalytics = async () => {
@@ -59,6 +64,18 @@ export default function QuestionVisualizer({ formId, question, groupByQuestionId
                     });
                 }
                 setRawData(formattedSeries);
+
+                // Auto-compute Silverman's rule of thumb bandwidth from all numeric values
+                const allValues = formattedSeries.flatMap(s => s.data).filter(v => typeof v === 'number');
+                if (allValues.length > 1) {
+                    const n = allValues.length;
+                    const mean = allValues.reduce((a, b) => a + b, 0) / n;
+                    const variance = allValues.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
+                    const std = Math.sqrt(variance);
+                    // Silverman: h = 0.9 * σ * n^(-1/5)
+                    const silverman = 0.9 * std * Math.pow(n, -0.2);
+                    setKdeBandwidth(parseFloat(silverman.toFixed(3)));
+                }
             } catch (error) {
                 console.error("Failed to fetch analytics", error);
             } finally {
@@ -68,13 +85,14 @@ export default function QuestionVisualizer({ formId, question, groupByQuestionId
 
         fetchRawAnalytics();
         setViewMode(defaultView);
+        setKdeEnabled(false); // reset KDE toggle when question changes
     }, [formId, question, groupByQuestionId]);
 
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
     return (
         <Paper sx={{ p: 4, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
                 <Box>
                     <Typography variant="h5">{question.text}</Typography>
                     <Typography variant="subtitle2" color="text.secondary">
@@ -82,22 +100,35 @@ export default function QuestionVisualizer({ formId, question, groupByQuestionId
                     </Typography>
                 </Box>
 
-                {question.question_type === 'scale' && (
-                    <ToggleButtonGroup size="small" value={viewMode} exclusive onChange={(e, val) => val && setViewMode(val)}>
-                        <ToggleButton value="histogram"><BarChart sx={{mr: 1}}/> Hist</ToggleButton>
-                        <ToggleButton value="box"><ShowChart sx={{mr: 1}}/> Box</ToggleButton>
-                        <ToggleButton value="violin">Violin</ToggleButton>
-                    </ToggleButtonGroup>
-                )}
+                {/* Right side: chart-type toggle + inline KDE settings */}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexShrink: 0 }}>
+                    {question.question_type === 'scale' && (
+                        <ToggleButtonGroup size="small" value={viewMode} exclusive onChange={(e, val) => val && setViewMode(val)}>
+                            <ToggleButton value="histogram"><BarChart sx={{mr: 1}}/> Hist</ToggleButton>
+                            <ToggleButton value="box"><ShowChart sx={{mr: 1}}/> Box</ToggleButton>
+                            <ToggleButton value="violin">Violin</ToggleButton>
+                        </ToggleButtonGroup>
+                    )}
 
-                {(question.question_type === 'single_choice' || question.question_type === 'multiple_choice') && (
-                    <ToggleButtonGroup size="small" value={viewMode} exclusive onChange={(e, val) => val && setViewMode(val)}>
-                        <ToggleButton value="pie"><BarChart sx={{mr: 1}}/> Hist</ToggleButton>
-                        <ToggleButton value="histogram"><ShowChart sx={{mr: 1}}/> Box</ToggleButton>
-                    </ToggleButtonGroup>
-                )}
+                    {(question.question_type === 'single_choice' || question.question_type === 'multiple_choice') && (
+                        <ToggleButtonGroup size="small" value={viewMode} exclusive onChange={(e, val) => val && setViewMode(val)}>
+                            <ToggleButton value="pie"><BarChart sx={{mr: 1}}/> Pie</ToggleButton>
+                            <ToggleButton value="histogram"><ShowChart sx={{mr: 1}}/> Hist</ToggleButton>
+                        </ToggleButtonGroup>
+                    )}
 
-                {/* ... other toggle buttons ... */}
+                    {/* KDE inline widget — visible only in histogram mode */}
+                    {viewMode === 'histogram' && (
+                        <KdeSettings
+                            kdeEnabled={kdeEnabled}
+                            kdeBandwidth={kdeBandwidth}
+                            onToggle={setKdeEnabled}
+                            onBandwidth={setKdeBandwidth}
+                            disabled={question.question_type !== 'scale'}
+                            disabledHint="KDE overlay is only available for numeric (scale) data"
+                        />
+                    )}
+                </Box>
             </Box>
 
             <Box sx={{ flexGrow: 1, minHeight: '300px' }}>
@@ -106,7 +137,9 @@ export default function QuestionVisualizer({ formId, question, groupByQuestionId
                     type={question.question_type}
                     mode={viewMode}
                     seriesData={rawData}
-                    question={question} // Pass the question object for min/max labels!
+                    question={question}
+                    kdeEnabled={kdeEnabled}
+                    kdeBandwidth={kdeBandwidth}
                 />
             </Box>
         </Paper>

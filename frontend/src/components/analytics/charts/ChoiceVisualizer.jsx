@@ -3,7 +3,9 @@ import PlotlyComponent from 'react-plotly.js';
 
 const Plot = PlotlyComponent.default || PlotlyComponent;
 
-export default function ChoiceVisualizer({ mode, data }) {
+// kdeEnabled and kdeBandwidth are received but intentionally unused here —
+// KDE is disabled for categorical choice data (the switch is shown but grayed out).
+export default function ChoiceVisualizer({ mode, data, kdeEnabled, kdeBandwidth }) {
     if (!data || data.length === 0) {
         return <div>No responses yet.</div>;
     }
@@ -44,7 +46,10 @@ export default function ChoiceVisualizer({ mode, data }) {
             type: 'histogram',
             name: s.name,
             x: flatten(s.data || []),
-            marker: { color: colors[i % colors.length] },
+            marker: {
+                color: colors[i % colors.length],
+                line: { color: 'rgba(0,0,0,0.35)', width: 1.5 },
+            },
             opacity: data.length > 1 ? 0.7 : 1,
         }));
         return (
