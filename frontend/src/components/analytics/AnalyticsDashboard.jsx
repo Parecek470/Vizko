@@ -10,7 +10,7 @@ import {
     Paper,
     Divider,
     Breadcrumbs,
-    Link,
+    Link, MenuItem, Select, InputLabel, FormControl,
 } from '@mui/material';
 import { ExpandLess, ExpandMore } from '@mui/icons-material';
 import QuestionVisualizer from './QuestionVisualizer';
@@ -26,6 +26,8 @@ export default function AnalyticsDashboard() {
     const [error, setError] = useState(null); // 1. Add error state
 
     const [openPages, setOpenPages] = useState({});
+    const [groupByQuestionId, setGroupByQuestionId] = useState('');
+    const groupableQuestions = form?.pages?.flatMap(page => page.questions).filter(q => q.question_type === 'single_choice' ) || [];
 
     useEffect(() => {
         const fetchForm = async () => {
@@ -61,7 +63,6 @@ export default function AnalyticsDashboard() {
         <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
             <Paper elevation={2} sx={{ width: '20vh', overflowY: 'auto', borderRadius: 0 }}>
                 <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white' }}>
-
                         <Link
                             component={RouterLink}
                             to={`/forms/${id}`}
@@ -122,13 +123,42 @@ export default function AnalyticsDashboard() {
                     ))}
                 </List>
             </Paper>
+            {/* Dashboard controls */}
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                {/* Dashboard controls */}
+                <Box sx={{ p: 2, bgcolor: 'background.paper', boxShadow: 1 }}>
+                    <Typography variant="h6" gutterBottom>
+                        Dashboard Controls
+                    </Typography>
 
-            <Box sx={{ flexGrow: 1, p: 4, overflowY: 'auto', bgcolor: '#f5f5f5' }}>
-                {selectedQuestion ? (
-                    <QuestionVisualizer formId={form.id} question={selectedQuestion} />
-                ) : (
-                    <Typography color="text.secondary">Select a question from the sidebar to view analytics.</Typography>
-                )}
+                    <FormControl sx={{ minWidth: 300 }}>
+                        <InputLabel id="group-by-label">Split data by...</InputLabel>
+                        <Select
+                            labelId="group-by-label"
+                            value={groupByQuestionId}
+                            label="Split data by..."
+                            onChange={(e) => setGroupByQuestionId(e.target.value)}
+                        >
+                            <MenuItem value="">
+                                <em>No grouping</em>
+                            </MenuItem>
+                            {groupableQuestions.map((q) => (
+                                <MenuItem key={q.id} value={q.id.toString()}>
+                                    {q.text}
+                                </MenuItem>
+                            ))}
+                        </Select>
+                    </FormControl>
+                </Box>
+
+                {/* Question visualizer */}
+                <Box sx={{ flexGrow: 1, p: 2, overflowY: 'auto', bgcolor: '#f5f5f5' }}>
+                    {selectedQuestion ? (
+                        <QuestionVisualizer formId={form.id} question={selectedQuestion} groupByQuestionId={groupByQuestionId} />
+                    ) : (
+                        <Typography color="text.secondary">Select a question from the sidebar to view analytics.</Typography>
+                    )}
+                </Box>
             </Box>
         </Box>
     );

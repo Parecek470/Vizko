@@ -3,15 +3,15 @@ import ChoiceVisualizer from './ChoiceVisualizer';
 import ScaleVisualizer from './ScaleVisualizer';
 import TextVisualizer from './TextVisualizer';
 
-export default function ChartSwitcher({ type, mode, data, question }) {
+export default function ChartSwitcher({ type, mode, seriesData, question, }) {
     switch (type) {
         case 'single_choice':
         case 'multiple_choice':
-            return <ChoiceVisualizer mode={mode} data={data} />;
+            return <ChoiceVisualizer mode={mode} seriesData={seriesData} />;
         case 'scale':
-            return <ScaleVisualizer mode={mode} data={data} question={question} />;
+            return <ScaleVisualizer mode={mode} data={seriesData} question={question} />;
         case 'text_open':
-            return <TextVisualizer data={data} />;
+            return <TextVisualizer seriesData={seriesData} />;
         default:
             return <div>Unsupported question type: {type}</div>;
     }

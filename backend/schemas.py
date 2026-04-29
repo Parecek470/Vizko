@@ -140,3 +140,13 @@ class QuestionAnalyticsResponse(BaseModel):
 
 class RawAnswersResponse(BaseModel):
     data: Dict[str, List[Any]]
+
+class AnalyticsResponseRow(BaseModel):
+    response_id: int
+    # Dictionary where key is the Question ID (as string) and value is the answer
+    answers: Dict[str, Any] 
+
+class CompleteAnalyticsResponse(BaseModel):
+    # We reuse the QuestionResponse schema, but provide it as a flat list
+    questions: List[QuestionResponse]
+    responses: List[AnalyticsResponseRow]

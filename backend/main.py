@@ -291,21 +291,39 @@ def get_question_analytics(form_id: int, question_id: int, db: Session = Depends
 
 @app.get("/forms/{form_id}/analytics/raw-answers", response_model=schemas.RawAnswersResponse)
 def get_raw_answers(form_id: int, q: List[int] = Query(...), db: Session = Depends(get_db), username: str = Depends(get_current_username)):
-    """Fetches raw answer data for a specific question/questions."""
-    raw_answers = db.query(models.Answer).join(models.FormSubmission).filter(
-        models.FormSubmission.form_id == form_id,
-        models.Answer.question_id.in_(q)
-    ).options(joinedload(models.Answer.selected_options)).all()
+    """Fetches raw answer data, maintaining strict row-alignment with null padding for skipped questions."""
+    
+    submissions = db.query(models.FormSubmission).filter(
+        models.FormSubmission.form_id == form_id
+    ).options(
+        joinedload(models.FormSubmission.answers).joinedload(models.Answer.selected_options)
+    ).order_by(models.FormSubmission.submitted_at).all()
 
     result_data = {str(qid): [] for qid in q}
     
-    for ans in raw_answers:
-        if ans.scale_value is not None:
-            result_data[str(ans.question_id)].append(ans.scale_value)
-        elif ans.text_value is not None and ans.text_value.strip() != "":
-            result_data[str(ans.question_id)].append(ans.text_value)
-        elif ans.selected_options:
-            for option in ans.selected_options:
-                result_data[str(ans.question_id)].append(option.text)
+    # 2. Iterate student by student
+    for sub in submissions:
+        # Create a fast lookup dictionary for this specific student's answers
+        student_answers = {ans.question_id: ans for ans in sub.answers}
+        
+        # 3. Check every requested question against this student
+        for qid in q:
+            ans = student_answers.get(qid)
+            
+            if not ans:
+                # CRITICAL: Pad gaps with None to prevent array misalignment
+                result_data[str(qid)].append(None)
+            elif ans.scale_value is not None:
+                result_data[str(qid)].append(ans.scale_value)
+            elif ans.text_value is not None and ans.text_value.strip() != "":
+                result_data[str(qid)].append(ans.text_value)
+            elif ans.selected_options:
+                # If single choice, extract string for Plotly. If multiple, keep array.
+                if len(ans.selected_options) == 1:
+                    result_data[str(qid)].append(ans.selected_options[0].text)
+                else:
+                    result_data[str(qid)].append([opt.text for opt in ans.selected_options])
+            else:
+                result_data[str(qid)].append(None)
 
     return {"data": result_data}

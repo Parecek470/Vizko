@@ -16,79 +16,87 @@ export default function ScaleVisualizer({ mode, data, question }) {
         margin: { l: 50, r: 20, t: 20, b: 50 },
         xaxis: {
             title: 'Scale Value',
-            // Force X-axis to show the exact scale (e.g., 1 to 5)
             range: [question.scale_min - 0.5, question.scale_max + 0.5],
             dtick: 1
         },
         yaxis: {
             title: mode === 'histogram' ? 'Count' : ''
-        }
+        },
+        violinmode: 'group',
+        boxmode: 'group',
+        barmode: 'group',
+        showlegend: data.length > 1,
     };
 
     const config = { responsive: true, displayModeBar: false };
 
-    // 1. VIOLIN PLOT (Plotly calculates the KDE curve automatically from raw data)
-    if (mode === 'violin') {
-        return (
-            <Plot
-                data={[{
-                    type: 'violin',
-                    x: data, // Just pass the raw array!
-                    box: { visible: true }, // Shows a mini box plot inside the violin
-                    meanline: { visible: true }, // Shows the mean
-                    points: 'all', // Show individual points next to the violin
-                    jitter: 0.3,
-                    pointpos: -1.5,
-                    marker: { color: '#1976d2' },
-                    name: '' // Hides the legend name
-                }]}
-                layout={layout}
-                config={config}
-                style={{ width: '100%', height: '100%' }}
-            />
-        );
+    // Color palette for multiple groups
+    const colors = ['#1976d2', '#9c27b0', '#2e7d32', '#f57c00', '#dc004e', '#0288d1'];
+
+    // Build one trace per series (group)
+    const plotTraces = data.map((series, index) => {
+        const color = colors[index % colors.length];
+
+        const baseTrace = {
+            name: series.name, // "CS", "Math", or "All Students"
+            x: series.data,    // The raw array of numeric scale values
+            showlegend: data.length > 1,
+        };
+
+        // 1. VIOLIN PLOT
+        if (mode === 'violin') {
+            return {
+                ...baseTrace,
+                type: 'violin',
+                box: { visible: true },
+                meanline: { visible: true },
+                points: 'all',
+                jitter: 0.3,
+                pointpos: -1.5,
+                marker: { color },
+            };
+        }
+
+        // 2. BOX PLOT
+        if (mode === 'box') {
+            return {
+                ...baseTrace,
+                type: 'box',
+                boxpoints: 'all',
+                jitter: 0.3,
+                pointpos: -1.8,
+                marker: { color },
+            };
+        }
+
+        // 3. HISTOGRAM
+        if (mode === 'histogram') {
+            return {
+                ...baseTrace,
+                type: 'histogram',
+                xbins: {
+                    start: question.scale_min - 0.5,
+                    end: question.scale_max + 0.5,
+                    size: 1
+                },
+                marker: { color },
+                opacity: data.length > 1 ? 0.7 : 1,
+            };
+        }
+
+        return null;
+    }).filter(Boolean);
+
+    if (plotTraces.length === 0) {
+        return <div>Unsupported mode: {mode}</div>;
     }
 
-    // 2. BOX PLOT (Plotly calculates quartiles automatically from raw data)
-    if (mode === 'box') {
-        return (
-            <Plot
-                data={[{
-                    type: 'box',
-                    x: data, // Just pass the raw array!
-                    boxpoints: 'all',
-                    jitter: 0.3,
-                    pointpos: -1.8,
-                    marker: { color: '#9c27b0' },
-                    name: ''
-                }]}
-                layout={layout}
-                config={config}
-                style={{ width: '100%', height: '100%' }}
-            />
-        );
-    }
-
-    // 3. HISTOGRAM
-    if (mode === 'histogram') {
-        return (
-            <Plot
-                data={[{
-                    type: 'histogram',
-                    x: data, // Just pass the raw array!
-                    xbins: {
-                        start: question.scale_min - 0.5,
-                        end: question.scale_max + 0.5,
-                        size: 1
-                    },
-                    marker: { color: '#2e7d32' },
-                }]}
-                layout={layout}
-                config={config}
-                style={{ width: '100%', height: '100%' }}
-            />
-        );
-    }
-
-    return null;
+    return (
+        <Plot
+            data={plotTraces}
+            layout={layout}
+            config={config}
+            style={{ width: '100%', height: '100%' }}
+        />
+    );
 }

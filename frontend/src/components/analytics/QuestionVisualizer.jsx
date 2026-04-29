@@ -4,9 +4,10 @@ import ChartSwitcher from './charts/ChartSwitcher';
 import { BarChart, PieChart, ShowChart, ScatterPlot } from '@mui/icons-material';
 import { apiFetch } from '../../utils/api';
 
-export default function QuestionVisualizer({ formId, question }) {
+export default function QuestionVisualizer({ formId, question, groupByQuestionId }) {
     // rawData will store an array like: [1, 1, 2, 4, 5] or ["Option A", "Option A", "Option B"]
     const [rawData, setRawData] = useState([]);
+    const [totalResponses, setTotalResponses] = useState(0);
     const [loading, setLoading] = useState(true);
 
     const defaultView = question.question_type === 'scale' ? 'histogram' :
@@ -17,16 +18,47 @@ export default function QuestionVisualizer({ formId, question }) {
         const fetchRawAnalytics = async () => {
             setLoading(true);
             try {
+                let queryParams = `?q=${question.id}`;
+
+                if (groupByQuestionId) {
+                    queryParams += `&q=${groupByQuestionId}`;
+                }
                 // Call the new universal raw-answers endpoint
                 const response = await apiFetch(
-                    `http://localhost:8000/forms/${formId}/analytics/raw-answers?q=${question.id}`
+                    `http://localhost:8000/forms/${formId}/analytics/raw-answers${queryParams}`
                 );
                 const json = await response.json();
 
                 // Extract the specific array for this question ID.
                 // Default to an empty array if nobody has answered yet.
                 const questionDataArray = json.data[question.id.toString()] || [];
-                setRawData(questionDataArray);
+                let formattedSeries = [];
+
+                setTotalResponses(questionDataArray.filter(v => v !== null).length);
+                if(!groupByQuestionId) {
+                    formattedSeries = [{
+                        name: 'All Students',
+                        data: questionDataArray.filter(val => val !== null)
+                    }];
+                }
+                else {
+                    // Group data is a SEPARATE array from the API, indexed the same way
+                    const groupData = json.data[groupByQuestionId.toString()] || [];
+                    const uniqueGroups = [...new Set(groupData)].filter(val => val !== null);
+
+                    formattedSeries = uniqueGroups.map(groupName => {
+                        // Extract only answers that match this specific group's index
+                        const groupSpecificData = questionDataArray.filter((val, index) => {
+                            return groupData[index] === groupName && val !== null;
+                        });
+
+                        return {
+                            name: groupName,
+                            data: groupSpecificData
+                        };
+                    });
+                }
+                setRawData(formattedSeries);
             } catch (error) {
                 console.error("Failed to fetch analytics", error);
             } finally {
@@ -36,7 +68,7 @@ export default function QuestionVisualizer({ formId, question }) {
 
         fetchRawAnalytics();
         setViewMode(defaultView);
-    }, [formId, question]);
+    }, [formId, question, groupByQuestionId]);
 
     if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}><CircularProgress /></Box>;
 
@@ -46,7 +78,7 @@ export default function QuestionVisualizer({ formId, question }) {
                 <Box>
                     <Typography variant="h5">{question.text}</Typography>
                     <Typography variant="subtitle2" color="text.secondary">
-                        n = {rawData.length} responses
+                        n = {totalResponses} responses
                     </Typography>
                 </Box>
 
@@ -66,7 +98,7 @@ export default function QuestionVisualizer({ formId, question }) {
                 <ChartSwitcher
                     type={question.question_type}
                     mode={viewMode}
-                    data={rawData}
+                    seriesData={rawData}
                     question={question} // Pass the question object for min/max labels!
                 />
             </Box>
