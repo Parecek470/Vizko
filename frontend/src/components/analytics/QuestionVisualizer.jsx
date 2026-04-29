@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Box, Typography, Paper, ToggleButton, ToggleButtonGroup, CircularProgress } from '@mui/material';
 import ChartSwitcher from './charts/ChartSwitcher';
 import { BarChart, PieChart, ShowChart, ScatterPlot } from '@mui/icons-material';
+import { apiFetch } from '../../utils/api';
 
 export default function QuestionVisualizer({ formId, question }) {
     // rawData will store an array like: [1, 1, 2, 4, 5] or ["Option A", "Option A", "Option B"]
@@ -17,7 +18,7 @@ export default function QuestionVisualizer({ formId, question }) {
             setLoading(true);
             try {
                 // Call the new universal raw-answers endpoint
-                const response = await fetch(
+                const response = await apiFetch(
                     `http://localhost:8000/forms/${formId}/analytics/raw-answers?q=${question.id}`
                 );
                 const json = await response.json();

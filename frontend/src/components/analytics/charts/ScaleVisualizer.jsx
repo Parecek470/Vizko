@@ -1,5 +1,8 @@
 import React from 'react';
-import Plot from 'react-plotly.js';
+import PlotlyComponent from 'react-plotly.js';
+
+// Vite CommonJS Interop Fix
+const Plot = PlotlyComponent.default || PlotlyComponent;
 
 export default function ScaleVisualizer({ mode, data, question }) {
     // If no data, show a friendly message

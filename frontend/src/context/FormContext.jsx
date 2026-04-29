@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect, useContext, useCallback } from 'react';
+import { apiFetch } from '../utils/api';
 
 const FormContext = createContext();
 
@@ -10,7 +11,22 @@ export function FormProvider({ children }) {
     const fetchForms = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await fetch('http://localhost:8000/forms/');
+            const token = localStorage.getItem('teacherToken');
+            const currentPath = window.location.pathname;
+            const isPublicRoute = currentPath.startsWith('/join')|| currentPath.startsWith('/login') || currentPath.startsWith('/respond');
+
+            if(!token && isPublicRoute) {
+                setLoading(false);
+                return;
+            }
+            const response = await apiFetch('http://localhost:8000/forms/',{
+                headers: token? { Authorization: `Basic ${token}` } : {}
+            });
+            if (response.status === 401) {
+                localStorage.removeItem('teacherToken');
+                window.location.href = '/join';
+                return;
+            }
             if (response.ok) {
                 const data = await response.json();
                 setForms(data);

@@ -1,5 +1,8 @@
 import React from 'react';
-import Plot from 'react-plotly.js';
+import PlotlyComponent from 'react-plotly.js';
+
+// Vite CommonJS Interop Fix: Unwrap the default export if Vite bundled it as an object
+const Plot = PlotlyComponent.default || PlotlyComponent;
 
 export default function ChoiceVisualizer({ mode, data }) {
     if (!data || data.length === 0) {

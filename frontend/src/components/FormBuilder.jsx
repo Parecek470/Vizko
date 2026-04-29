@@ -10,6 +10,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useForms } from '../context/FormContext';
+import {apiFetch} from "../utils/api.js";
 
 export default function FormBuilder() {
     const navigate = useNavigate();
@@ -124,7 +125,7 @@ export default function FormBuilder() {
         const payload = { title, description, is_active: isActive, pages };
 
         try {
-            const response = await fetch('http://localhost:8000/forms/', {
+            const response = await apiFetch('http://localhost:8000/forms/', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
