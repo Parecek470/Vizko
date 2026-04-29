@@ -19,7 +19,7 @@ export function FormProvider({ children }) {
                 setLoading(false);
                 return;
             }
-            const response = await apiFetch('http://10.0.1.53:8000/forms/',{
+            const response = await apiFetch('http://localhost:8000/forms/',{
                 headers: token? { Authorization: `Basic ${token}` } : {}
             });
             if (response.status === 401) {

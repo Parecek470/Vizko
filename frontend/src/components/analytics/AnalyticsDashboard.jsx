@@ -32,7 +32,7 @@ export default function AnalyticsDashboard() {
     useEffect(() => {
         const fetchForm = async () => {
             try {
-                const res = await apiFetch(`http://10.0.1.53:8000/forms/${id}`);
+                const res = await apiFetch(`http://localhost:8000/forms/${id}`);
                 if (res.ok) {
                     const data = await res.json();
                     setForm(data);

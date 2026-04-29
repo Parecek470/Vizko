@@ -15,7 +15,7 @@ export default function StudentFormViewer() {
 
     useEffect(() => {
         const fetchForm = async () => {
-            const res = await fetch(`http://10.0.1.53:8000/join/${code}`);
+            const res = await fetch(`http://localhost:8000/join/${code}`);
             if (res.ok) setForm(await res.json());
             setLoading(false);
         };
@@ -47,7 +47,7 @@ export default function StudentFormViewer() {
             }))
         };
 
-        const res = await fetch(`http://10.0.1.53:8000/forms/${form.id}/submissions`, {
+        const res = await fetch(`http://localhost:8000/forms/${form.id}/submissions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
