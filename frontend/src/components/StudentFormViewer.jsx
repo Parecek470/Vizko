@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Paper, Button, CircularProgress, RadioGroup, FormControlLabel, Radio, Checkbox, FormGroup, TextField, Slider } from '@mui/material';
+import { Box, Typography, Paper, Button, CircularProgress, RadioGroup, FormControlLabel, Radio, Checkbox, FormGroup, TextField, Slider, Tooltip } from '@mui/material';
 
 export default function StudentFormViewer() {
     const { code } = useParams();
@@ -64,6 +64,19 @@ export default function StudentFormViewer() {
 
     const currentPage = form.pages[currentPageIndex];
     const isLastPage = currentPageIndex === form.pages.length - 1;
+
+    const isQuestionAnswered = (q) => {
+        const ans = answers[q.id];
+        if (!ans) return false;
+        if (q.question_type === 'text_open') return (ans.text_value || '').trim().length > 0;
+        if (q.question_type === 'scale') return ans.scale_value != null;
+        // single_choice / multiple_choice
+        return (ans.selected_option_ids || []).length > 0;
+    };
+
+    const isCurrentPageValid = currentPage.questions
+        .filter(q => q.is_required)
+        .every(q => isQuestionAnswered(q));
 
     return (
         <Box sx={{ p: 4, maxWidth: 800, mx: 'auto' }}>
@@ -138,13 +151,27 @@ export default function StudentFormViewer() {
                     </Button>
 
                     {!isLastPage ? (
-                        <Button variant="contained" onClick={() => setCurrentPageIndex(p => p + 1)}>
-                            Next Page
-                        </Button>
+                        <Tooltip
+                            title={!isCurrentPageValid ? 'Please answer all required questions before continuing.' : ''}
+                            arrow
+                        >
+                            <span>
+                                <Button variant="contained" disabled={!isCurrentPageValid} onClick={() => setCurrentPageIndex(p => p + 1)}>
+                                    Next Page
+                                </Button>
+                            </span>
+                        </Tooltip>
                     ) : (
-                        <Button variant="contained" color="success" onClick={handleSubmit}>
-                            Submit Responses
-                        </Button>
+                        <Tooltip
+                            title={!isCurrentPageValid ? 'Please answer all required questions before submitting.' : ''}
+                            arrow
+                        >
+                            <span>
+                                <Button variant="contained" color="success" disabled={!isCurrentPageValid} onClick={handleSubmit}>
+                                    Submit Responses
+                                </Button>
+                            </span>
+                        </Tooltip>
                     )}
                 </Box>
             </Paper>

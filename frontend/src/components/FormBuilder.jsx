@@ -12,7 +12,7 @@ import SettingsIcon from '@mui/icons-material/Settings';
 import { useForms } from '../context/FormContext';
 import {apiFetch} from "../utils/api.js";
 
-export default function FormBuilder() {
+export default function FormBuilder({ }) {
     const navigate = useNavigate();
 
     // --- State ---
@@ -20,12 +20,15 @@ export default function FormBuilder() {
     const [description, setDescription] = useState('');
     const [isActive, setIsActive] = useState(false);
     const {refreshForms} = useForms();
+    const [editing, setEditing] = useState(location.pathname.includes('edit'))
 
     const [pages, setPages] = useState([{
         page_number: 1,
         title: '',
         questions: []
     }]);
+
+    // todo: on load check if editing is true, than restrict some buttons and prefill some data based on fetched document
 
     // Track what is currently active in the left editing panel
     const [selectedItem, setSelectedItem] = useState({ type: 'form', pageIndex: null, qIndex: null });

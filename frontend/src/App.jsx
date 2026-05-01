@@ -71,6 +71,7 @@ function App() {
             {/* TEACHER ROUTES (Wrapped in TeacherLayout) */}
             <Route element={<TeacherLayout />}>
               <Route path="/create" element={<FormBuilder />} />
+              <Route path="/forms/:id/edit" element={<FormBuilder />} />
               <Route path="/forms/:id" element={<FormDetail />} />
             </Route>
 

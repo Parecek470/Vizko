@@ -4,6 +4,9 @@ import { Box, Typography, Paper, Button, CircularProgress, Chip } from '@mui/mat
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useForms } from '../context/FormContext';
 import {apiFetch} from "../utils/api.js";
+import DownloadIcon from '@mui/icons-material/Download';
+import EditIcon from '@mui/icons-material/Edit';
+import CopyAllIcon from '@mui/icons-material/CopyAll';
 
 export default function FormDetail() {
     const { id } = useParams(); // Gets the ID from the URL
@@ -35,6 +38,27 @@ export default function FormDetail() {
         navigate('/create'); // Send back to home
     };
 
+    const handleDeleteResponses = async () => {
+        if (!window.confirm("Are you sure you want to delete all responses for this form?")) return; //todo: implement api call and call it
+    }
+
+    const handleExport = async () => {
+        return; //todo: implement answere format and export
+    }
+
+    const handleEdit = () => {
+        navigate(`/forms/${id}/edit`); //todo: implement route and fetch data
+    }
+
+    const handleDuplicate = async () => {
+        //todo: implement api call and call it
+        const res = await apiFetch(`http://localhost:8000/forms/${id}/duplicate`);
+        if (res.ok) {
+            const newForm = await res.json();
+            navigate(`/forms/${newForm.id}/edit`);
+        }
+    }
+
     if (loading) return <CircularProgress sx={{ m: 4 }} />;
     if (!form) return <Typography>Form not found.</Typography>;
 
@@ -53,17 +77,40 @@ export default function FormDetail() {
                     {form.description || "No description provided."}
                 </Typography>
 
-                <Typography variant="subtitle1" sx={{ mt: 2, mb: 1 }}>
+                <Typography variant="h2" align={"center"} sx={{ mt: 2, mb: 1 }}>
                     Join Code: <strong>{form.join_code}</strong>
                 </Typography>
 
                 <Box sx={{ mt: 4, display: 'flex', gap: 2 }}>
-                    <Button variant="contained" color="secondary" onClick={()=>navigate(`/forms/${id}/analytics`)}>
-                        View Analytics Dashboard
-                    </Button>
-                    <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDelete}>
-                        Delete Form
-                    </Button>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Button variant="contained" color="secondary" onClick={()=>navigate(`/forms/${id}/analytics`)}>
+                            View Analytics Dashboard
+                        </Button>
+                        <Button variant="contained" color="primary" startIcon={<DownloadIcon />} onClick={handleExport}>
+                            Export to csv
+                        </Button>
+                    </Box>
+
+                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        <Button variant="outlined" color="" startIcon={<CopyAllIcon />} onClick={handleDuplicate}>
+                            Duplicate form
+                        </Button>
+
+                        <Button variant="outlined" color="" startIcon={<EditIcon />} onClick={handleEdit}>
+                            Edit form
+                        </Button>
+                    </Box>
+                    <Box sx={{minWidth:"40px"}}/>
+                    <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }} >
+                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDeleteResponses}>
+                            Delete Form Responses
+                        </Button>
+
+                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDelete}>
+                            Delete Form
+                        </Button>
+
+                    </Box>
                 </Box>
             </Paper>
         </Box>
