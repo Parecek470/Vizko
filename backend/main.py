@@ -7,8 +7,7 @@ from sqlalchemy import func
 import secrets
 import os
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
-
-
+from dotenv import load_dotenv
 
 
 # my classes
@@ -17,6 +16,7 @@ import schemas
 from database import engine, SessionLocal
 import utils
 
+load_dotenv()
 
 #security
 security = HTTPBasic()
@@ -327,3 +327,136 @@ def get_raw_answers(form_id: int, q: List[int] = Query(...), db: Session = Depen
                 result_data[str(qid)].append(None)
 
     return {"data": result_data}
+
+@app.post("/forms/{form_id}/duplicate", response_model=schemas.FormDetailResponse)
+def duplicate_form(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """
+    Creates a deep copy of a form (pages, questions, options).
+    Submissions/responses are NOT copied.
+    The new form's title gets ' (copy)' appended.
+    """
+
+    # 1. Fetch the original form, or 404 if it doesn't exist
+    original_form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not original_form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    # 2. Create the new Form — fresh join_code, title with "(copy)", inactive by default
+    new_form = models.Form(
+        title=f"{original_form.title} (copy)",
+        description=original_form.description,
+        join_code=utils.get_unique_join_code(db),
+        is_active=False,  # copies start as inactive — safer default
+    )
+    db.add(new_form)
+    db.flush()  # populates new_form.id without committing yet
+
+    # 3. Deep-copy every page
+    for original_page in original_form.pages:
+        new_page = models.Page(
+            form_id=new_form.id,
+            page_number=original_page.page_number,
+            title=original_page.title,
+        )
+        db.add(new_page)
+        db.flush()  # populates new_page.id
+
+        # 4. Deep-copy every question within the page
+        for original_question in original_page.questions:
+            new_question = models.Question(
+                page_id=new_page.id,
+                text=original_question.text,
+                is_required=original_question.is_required,
+                question_type=original_question.question_type,
+                order=original_question.order,
+                scale_min=original_question.scale_min,
+                scale_max=original_question.scale_max,
+                scale_min_label=original_question.scale_min_label,
+                scale_max_label=original_question.scale_max_label,
+            )
+            db.add(new_question)
+            db.flush()  # populates new_question.id
+
+            # 5. Deep-copy every option within the question
+            for original_option in original_question.options:
+                new_option = models.QuestionOption(
+                    question_id=new_question.id,
+                    text=original_option.text,
+                    order=original_option.order,
+                )
+                db.add(new_option)
+
+    # 6. Commit everything at once — atomic operation
+    db.commit()
+    db.refresh(new_form)
+
+    return new_form
+
+@app.patch("/forms/{form_id}/text", response_model=schemas.FormDetailResponse)
+def patch_form_text(form_id: int, form_data: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """
+    Safe edit: updates only text fields on the form, pages, questions, and options.
+    Never touches IDs, structure, or answer data.
+    Matches incoming questions/options to existing ones by order.
+    """
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    # Update metadata
+    form.title = form_data.title
+    form.description = form_data.description
+    form.is_active = form_data.is_active
+
+    for page_in in form_data.pages:
+        db_page = next((p for p in form.pages if p.page_number == page_in.page_number), None)
+        if not db_page:
+            continue
+        db_page.title = page_in.title
+
+        for q_in in page_in.questions:
+            db_q = next((q for q in db_page.questions if q.order == q_in.order), None)
+            if not db_q:
+                continue
+            db_q.text = q_in.text
+            db_q.is_required = q_in.is_required
+            # Note: question_type is intentionally NOT updated here
+
+            for opt_in in q_in.options:
+                db_opt = next((o for o in db_q.options if o.order == opt_in.order), None)
+                if not db_opt:
+                    continue
+                db_opt.text = opt_in.text
+
+    db.commit()
+    db.refresh(form)
+    return form
+
+@app.delete("/forms/{form_id}/questions/{question_id}", status_code=204)
+def delete_question(form_id: int, question_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """
+    Deletes a single question and all its answers (via cascade).
+    Frontend is responsible for warning the user before calling this.
+    """
+    question = db.query(models.Question).filter(models.Question.id == question_id).first()
+    if not question:
+        raise HTTPException(status_code=404, detail="Question not found")
+
+    db.delete(question)
+    db.commit()
+
+@app.delete("/forms/{form_id}/pages/{page_id}", status_code=204)
+def delete_page(form_id: int, page_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """
+    Deletes a single page and all its questions and answers (via cascade).
+    Frontend is responsible for warning the user before calling this.
+    """
+    page = db.query(models.Page).filter(
+        models.Page.id == page_id,
+        models.Page.form_id == form_id  # safety check — page must belong to this form
+    ).first()
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+
+    db.delete(page)
+    db.commit()
