@@ -8,6 +8,10 @@ import secrets
 import os
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from dotenv import load_dotenv
+from fastapi.responses import StreamingResponse
+import csv
+import io
+from datetime import date
 
 
 # my classes
@@ -52,6 +56,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["Content-Disposition"],
 )
 
 # 2. Dependency: This function opens a database session per request, then closes it
@@ -460,3 +465,123 @@ def delete_page(form_id: int, page_id: int, db: Session = Depends(get_db), usern
 
     db.delete(page)
     db.commit()
+
+@app.put("/forms/{form_id}/structure", response_model=schemas.FormDetailResponse)
+def update_form_structure(form_id: int, form_data: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """Replaces a form's full structure (pages, questions, options). Does not touch submissions."""
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    # Update metadata
+    form.title = form_data.title
+    form.description = form_data.description
+    form.is_active = form_data.is_active
+
+    # Wipe and rebuild all pages/questions/options (submissions are untouched)
+    for page in form.pages:
+        db.delete(page)
+    db.flush()
+
+    for page_in in form_data.pages:
+        db_page = models.Page(form_id=form.id, page_number=page_in.page_number, title=page_in.title)
+        db.add(db_page)
+        db.flush()
+        for q_in in page_in.questions:
+            db_question = models.Question(
+                page_id=db_page.id, text=q_in.text, is_required=q_in.is_required,
+                question_type=q_in.question_type.value, order=q_in.order,
+                scale_min=q_in.scale_min, scale_max=q_in.scale_max,
+                scale_min_label=q_in.scale_min_label, scale_max_label=q_in.scale_max_label
+            )
+            db.add(db_question)
+            db.flush()
+            for opt_in in q_in.options:
+                db.add(models.QuestionOption(question_id=db_question.id, text=opt_in.text, order=opt_in.order))
+
+    db.commit()
+    db.refresh(form)
+    return form
+
+@app.delete("/forms/{form_id}/responses", status_code=204)
+def delete_form_responses(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """Deletes all submissions (and their answers) for a form, keeping the form itself intact."""
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    db.query(models.FormSubmission).filter(models.FormSubmission.form_id == form_id).delete()
+    db.commit()
+
+
+@app.get("/forms/{form_id}/export/csv")
+def export_form_csv(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """Exports all form responses as a CSV file, one row per submission."""
+
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    # Load all submissions with nested answers and options
+    submissions = (
+        db.query(models.FormSubmission)
+        .filter(models.FormSubmission.form_id == form_id)
+        .options(
+            joinedload(models.FormSubmission.answers)
+            .joinedload(models.Answer.selected_options)
+        )
+        .order_by(models.FormSubmission.submitted_at)
+        .all()
+    )
+
+    # Build a flat ordered list of all questions across all pages
+    questions = [
+        question
+        for page in sorted(form.pages, key=lambda p: p.page_number)
+        for question in sorted(page.questions, key=lambda q: q.order)
+    ]
+
+    # --- Build CSV in memory ---
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header row: metadata columns + one column per question
+    writer.writerow(
+        ["submitted_at"] +  # ← removed submission_id
+        [f"Q{i+1}: {q.text}" for i, q in enumerate(questions)]
+    )
+
+    # Data rows
+    for sub in submissions:
+        answer_map = {ans.question_id: ans for ans in sub.answers}
+
+        row = [sub.submitted_at.strftime("%Y-%m-%d %H:%M:%S")]
+
+        for q in questions:
+            ans = answer_map.get(q.id)
+            if not ans:
+                row.append("")
+            elif ans.scale_value is not None:
+                row.append(ans.scale_value)
+            elif ans.text_value is not None:
+                row.append(ans.text_value)
+            elif ans.selected_options:
+                # Join multiple choices into one cell — readable in Excel
+                row.append(" | ".join(opt.text for opt in ans.selected_options))
+            else:
+                row.append("")
+
+        writer.writerow(row)
+
+    output.seek(0)
+
+    # Sanitize form title for use in filename (remove special chars)
+    safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in form.title).strip().replace(" ", "_")
+    
+    filename = f"{date.today().isoformat()}_{safe_title}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

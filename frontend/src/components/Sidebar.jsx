@@ -76,24 +76,31 @@ export default function Sidebar() {
                                         onClick={() => navigate(`/forms/${form.id}`)}
                                         sx={{
                                             borderLeft: isActiveRoute ? '4px solid #1976d2' : '4px solid transparent',
-                                            pl: 2 // Padding left
+                                            pl: 2,
                                         }}
                                     >
                                         <ListItemText
                                             primary={
-                                                <Typography variant="subtitle2" sx={{ fontWeight: isActiveRoute ? 'bold' : 'normal' }}>
+                                                <Typography
+                                                    variant="subtitle2"
+                                                    sx={{
+                                                        fontWeight: 600,  // Always semibold — never changes width
+                                                        color: isActiveRoute ? 'primary.main' : 'text.primary',
+                                                        overflow: 'hidden',
+                                                        textOverflow: 'ellipsis',
+                                                        whiteSpace: 'nowrap',  // Bonus: prevents long titles from wrapping and reflowing too
+                                                    }}
+                                                >
                                                     {form.title}
                                                 </Typography>
                                             }
                                             secondary={`${form.response_count} Responses`}
                                         />
-
-                                        {/* Visual indicator for Form Status */}
                                         <Chip
                                             label={form.is_active ? "Live" : "Draft"}
                                             size="small"
                                             color={form.is_active ? "success" : "default"}
-                                            sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
+                                            sx={{ ml: 1, fontSize: '0.7rem', height: 20, flexShrink: 0 }}
                                         />
                                     </ListItemButton>
                                 </ListItem>

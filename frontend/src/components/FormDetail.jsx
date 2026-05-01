@@ -39,23 +39,55 @@ export default function FormDetail() {
     };
 
     const handleDeleteResponses = async () => {
-        if (!window.confirm("Are you sure you want to delete all responses for this form?")) return; //todo: implement api call and call it
+        if (!window.confirm("Are you sure you want to delete all responses for this form?")) return;
+        const res = await apiFetch(`http://localhost:8000/forms/${id}/responses`, {
+            method: 'DELETE',
+        });
+
+        if (res.ok) {
+            // Refresh form data so response_count updates to 0
+            const updated = await apiFetch(`http://localhost:8000/forms/${id}`) && refreshForms();
+
+            if (updated.ok) setForm(await updated.json());
+
+        } else {
+            console.error("Failed to delete responses:", res.status);
+        }
     }
 
-    const handleExport = async () => {
-        return; //todo: implement answere format and export
-    }
+    const handleExport = () => {
+        const token = localStorage.getItem('teacherToken');
+        // Append auth via a temporary anchor — browser handles the download natively
+        const url = `http://localhost:8000/forms/${id}/export/csv`;
+
+        // We need to fetch with auth headers and trigger download via blob
+        apiFetch(url).then(async (res) => {
+            if (!res.ok) return console.error("Export failed:", res.status);
+            const blob = await res.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            // Read filename from Content-Disposition header
+            const disposition = res.headers.get('Content-Disposition');
+            const match = disposition?.match(/filename="?([^";\n]+)"?/);
+            a.download = match?.[1]?.trim() ?? `export_${id}.csv`;
+            a.click();
+            URL.revokeObjectURL(objectUrl);
+        });
+    };
 
     const handleEdit = () => {
-        navigate(`/forms/${id}/edit`); //todo: implement route and fetch data
+        navigate(`/forms/${id}/edit`);
     }
 
     const handleDuplicate = async () => {
-        //todo: implement api call and call it
-        const res = await apiFetch(`http://localhost:8000/forms/${id}/duplicate`);
+        const res = await apiFetch(`http://localhost:8000/forms/${id}/duplicate`, { method: 'POST' });
         if (res.ok) {
             const newForm = await res.json();
+            await refreshForms();
             navigate(`/forms/${newForm.id}/edit`);
+        } else {
+            console.error("Failed to duplicate form:", res.status);
         }
     }
 
@@ -63,19 +95,28 @@ export default function FormDetail() {
     if (!form) return <Typography>Form not found.</Typography>;
 
     return (
-        <Box sx={{ p: 4, maxWidth: 800, mx: 'auto' }}>
+        <Box sx={{ p: 4, maxWidth: 1000, mx: 'auto' }}>
             <Paper sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h4">{form.title}</Typography>
-                    <Chip
-                        label={form.is_active ? "Live" : "Draft"}
-                        color={form.is_active ? "success" : "default"}
-                    />
+                    <Typography variant="h3">{form.title}</Typography>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                        <Chip
+                            label={form.is_active ? "Live" : "Draft"}
+                            color={form.is_active ? "success" : "default"}
+                        />
+                        <Chip
+                            label={`${form.response_count} Responses`}
+                            color="primary"
+                            variant="outlined"
+                        />
+                    </Box>
                 </Box>
 
                 <Typography color="text.secondary" paragraph>
                     {form.description || "No description provided."}
                 </Typography>
+
+
 
                 <Typography variant="h2" align={"center"} sx={{ mt: 2, mb: 1 }}>
                     Join Code: <strong>{form.join_code}</strong>
