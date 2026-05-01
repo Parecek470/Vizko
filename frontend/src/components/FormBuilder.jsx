@@ -1,43 +1,107 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Box, Typography, Paper, TextField, Switch, FormGroup,
     FormControlLabel, Button, Alert, Card, CardContent,
     IconButton, Select, MenuItem, InputLabel, FormControl,
-    Grid, Divider
+    Grid, Divider, CircularProgress
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
 import SettingsIcon from '@mui/icons-material/Settings';
 import { useForms } from '../context/FormContext';
-import {apiFetch} from "../utils/api.js";
+import { apiFetch } from '../utils/api.js';
 
-export default function FormBuilder({ }) {
+export default function FormBuilder() {
     const navigate = useNavigate();
+    const { id } = useParams();               // present when route is /forms/:id/edit
+    const location = useLocation();           // reliable way to read current pathname
+    const isEditing = location.pathname.includes('edit');
 
-    // --- State ---
+    const { refreshForms } = useForms();
+
+    // --- Form metadata state ---
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [isActive, setIsActive] = useState(false);
-    const {refreshForms} = useForms();
-    const [editing, setEditing] = useState(location.pathname.includes('edit'))
+    const [hasResponses, setHasResponses] = useState(false);
+    const [responseCount, setResponseCount] = useState(0);
 
+
+    // --- Pages / questions state ---
     const [pages, setPages] = useState([{
         page_number: 1,
         title: '',
         questions: []
     }]);
 
-    // todo: on load check if editing is true, than restrict some buttons and prefill some data based on fetched document
-
-    // Track what is currently active in the left editing panel
+    // --- UI state ---
     const [selectedItem, setSelectedItem] = useState({ type: 'form', pageIndex: null, qIndex: null });
-
     const [error, setError] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [loadingForm, setLoadingForm] = useState(false);
 
     // ==========================================
-    // MUTATION HANDLERS (Same as before)
+    // HYDRATE STATE WHEN EDITING
+    // ==========================================
+
+    useEffect(() => {
+        if (!isEditing || !id) return;
+
+        const fetchAndPopulate = async () => {
+            setLoadingForm(true);
+            try {
+                const res = await apiFetch(`http://localhost:8000/forms/${id}`);
+                if (!res.ok) {
+                    setError('Failed to load form for editing.');
+                    return;
+                }
+                const form = await res.json();
+
+                // Populate top-level metadata
+                setTitle(form.title);
+                setDescription(form.description ?? '');
+                setIsActive(form.is_active);
+                setHasResponses(form.response_count > 0);
+                setResponseCount(form.response_count);
+
+                // Populate pages — map API shape to local state shape
+                const hydratedPages = form.pages.map(page => ({
+                    id: page.id,
+                    page_number: page.page_number,
+                    title: page.title ?? '',
+                    questions: page.questions.map(q => ({
+                        id: q.id,
+                        text: q.text,
+                        question_type: q.question_type,
+                        is_required: q.is_required,
+                        order: q.order,
+                        scale_min: q.scale_min ?? null,
+                        scale_max: q.scale_max ?? null,
+                        scale_min_label: q.scale_min_label ?? '',
+                        scale_max_label: q.scale_max_label ?? '',
+                        options: (q.options ?? []).map(opt => ({
+                            id: opt.id,
+                            text: opt.text,
+                            order: opt.order
+                        }))
+                    }))
+                }));
+
+                setPages(hydratedPages);
+            } catch (err) {
+                setError('Network error while loading form.');
+                console.error(err);
+            } finally {
+                setLoadingForm(false);
+            }
+        };
+
+        fetchAndPopulate();
+    }, [isEditing, id]);
+
+    // ==========================================
+    // MUTATION HANDLERS
     // ==========================================
 
     const handleAddPage = () => {
@@ -46,12 +110,30 @@ export default function FormBuilder({ }) {
         setSelectedItem({ type: 'page', pageIndex: newPages.length - 1, qIndex: null });
     };
 
-    const handleRemovePage = (pageIndex) => {
+    const handleRemovePage = async (pageIndex) => {
+        const page = pages[pageIndex];
+
+        if (isEditing && hasResponses) {
+            if (pages.length === 1) {
+                alert("A form must have at least one page.");
+                return;
+            }
+
+            const confirmed = window.confirm(
+                `Warning: This form has responses. Deleting this page will permanently delete all questions on it and their responses. This cannot be undone. Continue?`
+            );
+            if (!confirmed) return;
+
+            await apiFetch(`http://localhost:8000/forms/${id}/pages/${page.id}`, {
+                method: 'DELETE'
+            });
+        }
+
         const newPages = [...pages];
         newPages.splice(pageIndex, 1);
         newPages.forEach((p, i) => p.page_number = i + 1);
         setPages(newPages);
-        setSelectedItem({ type: 'form', pageIndex: null, qIndex: null }); // Reset selection
+        setSelectedItem({ type: 'form', pageIndex: null, qIndex: null });
     };
 
     const handlePageChange = (pageIndex, field, value) => {
@@ -71,17 +153,54 @@ export default function FormBuilder({ }) {
         };
         newPages[pageIndex].questions.push(newQuestion);
         setPages(newPages);
-
-        // Auto-select the newly created question
         setSelectedItem({ type: 'question', pageIndex, qIndex: newPages[pageIndex].questions.length - 1 });
     };
 
-    const handleRemoveQuestion = (pageIndex, qIndex) => {
-        const newPages = [...pages];
-        newPages[pageIndex].questions.splice(qIndex, 1);
-        newPages[pageIndex].questions.forEach((q, i) => q.order = i + 1);
-        setPages(newPages);
-        setSelectedItem({ type: 'page', pageIndex, qIndex: null }); // Fallback selection
+    const handleRemoveQuestion = async (pageIndex, qIndex) => {
+        const question = pages[pageIndex].questions[qIndex];
+        const isLastQuestionOnPage = pages[pageIndex].questions.length === 1;
+        const isLastPage = pages.length === 1;
+
+        // Build a single confirmation message that covers both cases
+        let warningMessage = `Warning: This form has responses. Deleting this question will permanently delete all responses to it.`;
+
+        if (isLastQuestionOnPage && !isLastPage) {
+            warningMessage += `\n\nThis is the last question on Page ${pageIndex + 1}. The page will also be deleted.`;
+        }
+
+        if (isEditing && hasResponses) {
+            const confirmed = window.confirm(warningMessage + `\n\nThis cannot be undone. Continue?`);
+            if (!confirmed) return;
+
+            if (isLastQuestionOnPage && !isLastPage) {
+                // Delete the whole page (cascades to the question anyway)
+                await apiFetch(`http://localhost:8000/forms/${id}/pages/${pages[pageIndex].id}`, {
+                    method: 'DELETE'
+                });
+            } else {
+                // Delete just the question
+                await apiFetch(`http://localhost:8000/forms/${id}/questions/${question.id}`, {
+                    method: 'DELETE'
+                });
+            }
+        }
+
+        // Update local state
+        if (isLastQuestionOnPage && !isLastPage) {
+            // Remove the whole page from local state
+            const newPages = [...pages];
+            newPages.splice(pageIndex, 1);
+            newPages.forEach((p, i) => p.page_number = i + 1);
+            setPages(newPages);
+            setSelectedItem({ type: 'form', pageIndex: null, qIndex: null });
+        } else {
+            // Remove just the question from local state
+            const newPages = [...pages];
+            newPages[pageIndex].questions.splice(qIndex, 1);
+            newPages[pageIndex].questions.forEach((q, i) => q.order = i + 1);
+            setPages(newPages);
+            setSelectedItem({ type: 'page', pageIndex, qIndex: null });
+        }
     };
 
     const handleQuestionChange = (pageIndex, qIndex, field, value) => {
@@ -115,9 +234,13 @@ export default function FormBuilder({ }) {
         setPages(newPages);
     };
 
+    // ==========================================
+    // SUBMIT — branches on isEditing
+    // ==========================================
+
     const handleSubmit = async () => {
         if (!title.trim()) {
-            setError("Form title is required.");
+            setError('Form title is required.');
             setSelectedItem({ type: 'form', pageIndex: null, qIndex: null });
             return;
         }
@@ -128,22 +251,38 @@ export default function FormBuilder({ }) {
         const payload = { title, description, is_active: isActive, pages };
 
         try {
-            const response = await apiFetch('http://localhost:8000/forms/', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload),
-            });
+            let response;
 
-            if (response.ok) {
-                const newForm = await response.json();
-                await refreshForms();
-                navigate(`/forms/${newForm.id}`);
-            } else {
-                const errorData = await response.json();
-                setError(errorData.detail || "Failed to create form.");
+            if (isEditing) {
+                if (hasResponses) {
+                    // text-only patch 
+                    response = await apiFetch(`http://localhost:8000/forms/${id}/text`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                } else {
+                    // Full structural replace (no responses to protect)
+                    response = await apiFetch(`http://localhost:8000/forms/${id}/structure`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload),
+                    });
+                }
             }
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                setError(errorData.detail || 'An error occurred.');
+                return;
+            }
+
+            const savedForm = await response.json();
+            await refreshForms();
+            navigate(`/forms/${savedForm.id}`);
+
         } catch (err) {
-            setError("Network error: Could not connect to the backend.");
+            setError('Network error. Is the backend running?');
         } finally {
             setIsSubmitting(false);
         }
@@ -154,111 +293,112 @@ export default function FormBuilder({ }) {
     // RENDER HELPERS
     // ==========================================
 
+    const renderFormSettings = () => (
+        <Box>
+            <Typography variant="h6" gutterBottom>Form Settings</Typography>
+            <TextField label="Form Title" fullWidth variant="outlined" value={title} onChange={(e) => setTitle(e.target.value)} sx={{ mb: 2 }} required />
+            <TextField label="Description" fullWidth variant="outlined" multiline rows={3} value={description} onChange={(e) => setDescription(e.target.value)} sx={{ mb: 2 }} />
+            <FormGroup>
+                <FormControlLabel control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Set as Active (Live)" />
+            </FormGroup>
+            <Divider sx={{ my: 3 }} />
+            <Button variant="contained" color="success" fullWidth size="large" onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting ? 'Saving...' : 'Save & Publish Form'}
+            </Button>
+        </Box>
+    );
+
+    const renderPageSettings = () => {
+        const pageIndex = selectedItem.pageIndex;
+        const page = pages[pageIndex];
+        return (
+            <Box>
+                <Typography variant="h6" gutterBottom>Page {page.page_number} Settings</Typography>
+                <TextField label="Page Title (Optional)" fullWidth value={page.title} onChange={(e) => handlePageChange(selectedItem.pageIndex, 'title', e.target.value)} sx={{ mb: 3 }} />
+                <Button variant="outlined" color="error" fullWidth startIcon={<DeleteIcon />} onClick={() => handleRemovePage(selectedItem.pageIndex)} disabled={pages.length === 1}>
+                    Delete Page
+                </Button>
+            </Box>
+        );
+    }
+
+    const renderQuestionSettings = (pageIndex, qIndex) => {
+        const question = pages[pageIndex].questions[qIndex];
+        return (
+            <Box>
+                <Typography variant="h6" gutterBottom>Edit Question</Typography>
+
+                <TextField label="Question Text" fullWidth multiline rows={2} value={question.text} onChange={(e) => handleQuestionChange(pageIndex, qIndex, 'text', e.target.value)} sx={{ mb: 3 }} required />
+
+                <FormControl fullWidth sx={{ mb: 3 }}>
+                    <InputLabel>Question Type</InputLabel>
+                    <Select value={question.question_type} label="Question Type" onChange={(e) => handleQuestionChange(pageIndex, qIndex, 'question_type', e.target.value)}>
+                        <MenuItem value="single_choice">Single Choice</MenuItem>
+                        <MenuItem value="multiple_choice">Multiple Choice</MenuItem>
+                        <MenuItem value="scale">Scale (1-N)</MenuItem>
+                        <MenuItem value="text_open">Open Text</MenuItem>
+                    </Select>
+                </FormControl>
+
+                <FormGroup sx={{ mb: 3 }}>
+                    <FormControlLabel control={<Switch checked={question.is_required} onChange={(e) => handleQuestionChange(pageIndex, qIndex, 'is_required', e.target.checked)} />} label="Required Question" />
+                </FormGroup>
+
+                <Divider sx={{ my: 2 }} />
+
+                {/* Options Editor */}
+                {(question.question_type === 'single_choice' || question.question_type === 'multiple_choice') && (
+                    <Box>
+                        <Typography variant="subtitle2" gutterBottom>Options</Typography>
+                        {question.options.map((opt, oIndex) => (
+                            <Box key={oIndex} sx={{ display: 'flex', mb: 1 }}>
+                                <TextField size="small" fullWidth placeholder={`Option ${oIndex + 1}`} value={opt.text} onChange={(e) => handleOptionChange(pageIndex, qIndex, oIndex, e.target.value)} sx={{ mr: 1 }} />
+                                <IconButton size="small" color="error" onClick={() => handleRemoveOption(pageIndex, qIndex, oIndex)} disabled={isEditing && hasResponses}>
+                                    <DeleteIcon fontSize="small"  />
+                                </IconButton>
+                            </Box>
+                        ))}
+                        <Button size="small" startIcon={<AddCircleIcon />} onClick={() => handleAddOption(pageIndex, qIndex)}  disabled={isEditing && hasResponses}>Add Option</Button>
+                    </Box>
+                )}
+
+                {/* Scale Editor */}
+                {question.question_type === 'scale' && (
+                    <Grid container spacing={2}>
+                        <Grid item xs={6}>
+                            <TextField type="number" label="Min Value" size="small" fullWidth value={question.scale_min || ''} onChange={(e) => handleQuestionChange(pageIndex, qIndex, 'scale_min', parseInt(e.target.value))} />
+                        </Grid>
+                        <Grid item xs={6}>
+                            <TextField type="number" label="Max Value" size="small" fullWidth value={question.scale_max || ''} onChange={(e) => handleQuestionChange(pageIndex, qIndex, 'scale_max', parseInt(e.target.value))} />
+                        </Grid>
+                        <Grid item xs={6}>
+                            <TextField label="Min Label" size="small" fullWidth value={question.scale_min_label || ''} onChange={(e) => handleQuestionChange(pageIndex, qIndex, 'scale_min_label', e.target.value)} />
+                        </Grid>
+                        <Grid item xs={6}>
+                            <TextField label="Max Label" size="small" fullWidth value={question.scale_max_label || ''} onChange={(e) => handleQuestionChange(pageIndex, qIndex, 'scale_max_label', e.target.value)} />
+                        </Grid>
+                    </Grid>
+                )}
+
+                <Divider sx={{ my: 3 }} />
+                <Button variant="outlined" color="error" fullWidth startIcon={<DeleteIcon />} onClick={() => handleRemoveQuestion(pageIndex, qIndex)}>
+                    Delete Question
+                </Button>
+            </Box>
+        )
+    }
+
     // Dynamic Left Panel Content based on what is selected
     const renderEditorPanel = () => {
-        if (selectedItem.type === 'form') {
-            return (
-                <Box>
-                    <Typography variant="h6" gutterBottom>Form Settings</Typography>
-                    <TextField label="Form Title" fullWidth variant="outlined" value={title} onChange={(e) => setTitle(e.target.value)} sx={{ mb: 2 }} required />
-                    <TextField label="Description" fullWidth variant="outlined" multiline rows={3} value={description} onChange={(e) => setDescription(e.target.value)} sx={{ mb: 2 }} />
-                    <FormGroup>
-                        <FormControlLabel control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Set as Active (Live)" />
-                    </FormGroup>
-                    <Divider sx={{ my: 3 }} />
-                    <Button variant="contained" color="success" fullWidth size="large" onClick={handleSubmit} disabled={isSubmitting}>
-                        {isSubmitting ? 'Saving...' : 'Save & Publish Form'}
-                    </Button>
-                </Box>
-            );
-        }
-
-        if (selectedItem.type === 'page' && selectedItem.pageIndex !== null) {
-            const page = pages[selectedItem.pageIndex];
-            return (
-                <Box>
-                    <Typography variant="h6" gutterBottom>Page {page.page_number} Settings</Typography>
-                    <TextField label="Page Title (Optional)" fullWidth value={page.title} onChange={(e) => handlePageChange(selectedItem.pageIndex, 'title', e.target.value)} sx={{ mb: 3 }} />
-                    <Button variant="outlined" color="error" fullWidth startIcon={<DeleteIcon />} onClick={() => handleRemovePage(selectedItem.pageIndex)} disabled={pages.length === 1}>
-                        Delete Page
-                    </Button>
-                </Box>
-            );
-        }
-
-        if (selectedItem.type === 'question' && selectedItem.pageIndex !== null && selectedItem.qIndex !== null) {
-            const pIdx = selectedItem.pageIndex;
-            const qIdx = selectedItem.qIndex;
-            const question = pages[pIdx].questions[qIdx];
-
-            return (
-                <Box>
-                    <Typography variant="h6" gutterBottom>Edit Question</Typography>
-
-                    <TextField label="Question Text" fullWidth multiline rows={2} value={question.text} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'text', e.target.value)} sx={{ mb: 3 }} required />
-
-                    <FormControl fullWidth sx={{ mb: 3 }}>
-                        <InputLabel>Question Type</InputLabel>
-                        <Select value={question.question_type} label="Question Type" onChange={(e) => handleQuestionChange(pIdx, qIdx, 'question_type', e.target.value)}>
-                            <MenuItem value="single_choice">Single Choice</MenuItem>
-                            <MenuItem value="multiple_choice">Multiple Choice</MenuItem>
-                            <MenuItem value="scale">Scale (1-N)</MenuItem>
-                            <MenuItem value="text_open">Open Text</MenuItem>
-                        </Select>
-                    </FormControl>
-
-                    <FormGroup sx={{ mb: 3 }}>
-                        <FormControlLabel control={<Switch checked={question.is_required} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'is_required', e.target.checked)} />} label="Required Question" />
-                    </FormGroup>
-
-                    <Divider sx={{ my: 2 }} />
-
-                    {/* Options Editor */}
-                    {(question.question_type === 'single_choice' || question.question_type === 'multiple_choice') && (
-                        <Box>
-                            <Typography variant="subtitle2" gutterBottom>Options</Typography>
-                            {question.options.map((opt, oIndex) => (
-                                <Box key={oIndex} sx={{ display: 'flex', mb: 1 }}>
-                                    <TextField size="small" fullWidth placeholder={`Option ${oIndex + 1}`} value={opt.text} onChange={(e) => handleOptionChange(pIdx, qIdx, oIndex, e.target.value)} sx={{ mr: 1 }} />
-                                    <IconButton size="small" color="error" onClick={() => handleRemoveOption(pIdx, qIdx, oIndex)}>
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </Box>
-                            ))}
-                            <Button size="small" startIcon={<AddCircleIcon />} onClick={() => handleAddOption(pIdx, qIdx)}>Add Option</Button>
-                        </Box>
-                    )}
-
-                    {/* Scale Editor */}
-                    {question.question_type === 'scale' && (
-                        <Grid container spacing={2}>
-                            <Grid item xs={6}>
-                                <TextField type="number" label="Min Value" size="small" fullWidth value={question.scale_min || ''} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'scale_min', parseInt(e.target.value))} />
-                            </Grid>
-                            <Grid item xs={6}>
-                                <TextField type="number" label="Max Value" size="small" fullWidth value={question.scale_max || ''} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'scale_max', parseInt(e.target.value))} />
-                            </Grid>
-                            <Grid item xs={6}>
-                                <TextField label="Min Label" size="small" fullWidth value={question.scale_min_label || ''} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'scale_min_label', e.target.value)} />
-                            </Grid>
-                            <Grid item xs={6}>
-                                <TextField label="Max Label" size="small" fullWidth value={question.scale_max_label || ''} onChange={(e) => handleQuestionChange(pIdx, qIdx, 'scale_max_label', e.target.value)} />
-                            </Grid>
-                        </Grid>
-                    )}
-
-                    <Divider sx={{ my: 3 }} />
-                    <Button variant="outlined" color="error" fullWidth startIcon={<DeleteIcon />} onClick={() => handleRemoveQuestion(pIdx, qIdx)}>
-                        Delete Question
-                    </Button>
-                </Box>
-            );
-        }
-        return null;
+        const { type, pageIndex, qIndex } = selectedItem;
+        if (type == 'form') return renderFormSettings();
+        if (type === 'page') return renderPageSettings(pageIndex);
+        if (type === 'question') return renderQuestionSettings(pageIndex, qIndex);
     };
 
+
     return (
-        <Box sx={{ display: 'flex', width: '100%', height: '100%'}}>
+        <Box sx={{ display: 'flex', width: '100%', height: '100%' }}>
 
             {/* ========================================== */}
             {/* MAIN PANEL: The Canvas View (Now on Left)  */}
@@ -328,7 +468,13 @@ export default function FormBuilder({ }) {
                             })}
 
                             {/* Canvas Actions */}
-                            <Button variant="outlined" sx={{ mt: 1 }} startIcon={<AddCircleIcon />} onClick={() => handleAddQuestion(pIndex)}>
+                            <Button
+                                variant="outlined"
+                                sx={{ mt: 1 }}
+                                startIcon={<AddCircleIcon />}
+                                onClick={() => handleAddQuestion(pIndex)}
+                                disabled={isEditing && hasResponses}
+                            >
                                 Add Question to Page {page.page_number}
                             </Button>
                         </Box>
