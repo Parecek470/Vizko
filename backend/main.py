@@ -611,7 +611,6 @@ def delete_all_responses(form_id: int, db: Session = Depends(get_db), username: 
         models.FormSubmission.form_id == form_id
     ).delete(synchronize_session=False)
 
-    form.response_count = 0
 
     db.commit()
     return None
