@@ -250,7 +250,7 @@ export default function FormBuilder() {
         setIsSubmitting(true);
         setError(null);
 
-        const payload = { title, description, is_active: isActive,is_shared:isShared, pages };
+        const payload = { title, description, is_active: isActive, is_shared:isShared, pages };
 
         try {
             let response;

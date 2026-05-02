@@ -79,6 +79,7 @@ class FormSummaryResponse(BaseModel):
     is_active: bool
     response_count: int
     is_shared: bool
+    owner:str
     model_config = ConfigDict(from_attributes=True)
 
 class FormDetailResponse(BaseModel):
@@ -89,6 +90,7 @@ class FormDetailResponse(BaseModel):
     join_code: str
     response_count: int
     is_shared: bool
+    owner: str
     pages: List[PageResponse]
     model_config = ConfigDict(from_attributes=True)
 

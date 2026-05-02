@@ -7,12 +7,12 @@ import {apiFetch} from "../utils/api.js";
 import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import CopyAllIcon from '@mui/icons-material/CopyAll';
+import { getCurrentUsername} from "../utils/auth.js";
 
 export default function FormDetail() {
     const { id } = useParams(); // Gets the ID from the URL
     const navigate = useNavigate();
     const { refreshForms } = useForms();
-    const [isShared, setIsShared] = useState(false);
 
 
     const [form, setForm] = useState(null);
@@ -24,7 +24,6 @@ export default function FormDetail() {
                 const res = await apiFetch(`/forms/${id}`);
                 if (res.ok){
                     setForm(await res.json());
-                    setIsShared(form.is_shared);
                 }
 
             } catch (err) {
@@ -35,6 +34,13 @@ export default function FormDetail() {
         };
         fetchFormDetail();
     }, [id]);
+
+    if (loading) return <CircularProgress sx={{ m: 4 }} />;
+    if (!form) return <Typography>Form not found.</Typography>;
+
+    const currentUser = getCurrentUsername();
+    const isOwner = form.owner === currentUser;
+    const isReadOnly = !isOwner;
 
     const handleDelete = async () => {
         if (!window.confirm("Are you sure you want to delete this form and all its responses?")) return;
@@ -58,7 +64,7 @@ export default function FormDetail() {
 
     const handleDuplicate = async () => {
         //todo: implement api call and call it
-        const res = await apiFetch(`/forms/${id}/duplicate`);
+        const res = await apiFetch(`/forms/${id}/duplicate`, { method: 'POST' });
         if (res.ok) {
             const newForm = await res.json();
             navigate(`/forms/${newForm.id}/edit`);
@@ -105,17 +111,17 @@ export default function FormDetail() {
                             Duplicate form
                         </Button>
 
-                        <Button variant="outlined" color="" startIcon={<EditIcon />} disabled={isShared} onClick={handleEdit}>
+                        <Button variant="outlined" color="" startIcon={<EditIcon />} disabled={isReadOnly} onClick={handleEdit}>
                             Edit form
                         </Button>
                     </Box>
                     <Box sx={{minWidth:"40px"}}/>
                     <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }} >
-                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} disabled={isShared} onClick={handleDeleteResponses}>
+                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} disabled={isReadOnly} onClick={handleDeleteResponses}>
                             Delete Form Responses
                         </Button>
 
-                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} disabled={isShared} onClick={handleDelete}>
+                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} disabled={isReadOnly} onClick={handleDelete}>
                             Delete Form
                         </Button>
 

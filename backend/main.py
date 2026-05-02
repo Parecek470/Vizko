@@ -55,6 +55,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+
 )
 
 # 2. Dependency: This function opens a database session per request, then closes it
@@ -367,7 +368,7 @@ def duplicate_form(form_id: int, db: Session = Depends(get_db), username: str = 
     original_form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not original_form:
         raise HTTPException(status_code=404, detail="Form not found")
-    if not form.is_shared or form.owner != username:
+    if not original_form.is_shared and original_form.owner != username:
         raise HTTPException(status_code=403, detail="Access denied")
 
     # 2. Create the new Form — fresh join_code, title with "(copy)", inactive by default
@@ -376,6 +377,8 @@ def duplicate_form(form_id: int, db: Session = Depends(get_db), username: str = 
         description=original_form.description,
         join_code=utils.get_unique_join_code(db),
         is_active=False,  # copies start as inactive — safer default
+        owner=username,
+        is_shared=False,
     )
     db.add(new_form)
     db.flush()  # populates new_form.id without committing yet

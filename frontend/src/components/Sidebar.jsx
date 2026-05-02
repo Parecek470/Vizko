@@ -14,11 +14,13 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useForms } from '../context/FormContext';
+import { getCurrentUsername } from '../utils/auth';
 
 export default function Sidebar() {
     const { forms, loading } = useForms();
-    const myForms = forms.filter(f => !f.is_shared);
-    const sharedForms = forms.filter(f => f.is_shared);
+    const currentUser = getCurrentUsername();
+    const myForms = forms.filter(f => f.owner === currentUser);
+    const sharedForms = forms.filter(f => f.owner !== currentUser);
 
     // React Router hooks for navigation
     const navigate = useNavigate();
@@ -67,7 +69,7 @@ export default function Sidebar() {
                     </Typography>
                 ) : (
                     <List disablePadding>
-                        {forms.map((form) => {
+                        {myForms.map((form) => {
                             // Check if the current URL matches this form to highlight the active tab
                             const isActiveRoute = location.pathname === `/forms/${form.id}`;
 
