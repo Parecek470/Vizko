@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Typography, Paper, Button, CircularProgress, RadioGroup, FormControlLabel, Radio, Checkbox, FormGroup, TextField, Slider, Tooltip } from '@mui/material';
+import {publicFetch} from "../utils/api.js";
 
 export default function StudentFormViewer() {
     const { code } = useParams();
@@ -15,7 +16,7 @@ export default function StudentFormViewer() {
 
     useEffect(() => {
         const fetchForm = async () => {
-            const res = await fetch(`http://localhost:8000/join/${code}`);
+            const res = await publicFetch(`/join/${code}`);
             if (res.ok) setForm(await res.json());
             setLoading(false);
         };
@@ -47,7 +48,7 @@ export default function StudentFormViewer() {
             }))
         };
 
-        const res = await fetch(`http://localhost:8000/forms/${form.id}/submissions`, {
+        const res = await publicFetch(`/forms/${form.id}/submissions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)

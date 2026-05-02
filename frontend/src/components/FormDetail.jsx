@@ -19,7 +19,7 @@ export default function FormDetail() {
     useEffect(() => {
         const fetchFormDetail = async () => {
             try {
-                const res = await apiFetch(`http://localhost:8000/forms/${id}`);
+                const res = await apiFetch(`/forms/${id}`);
                 if (res.ok) setForm(await res.json());
             } catch (err) {
                 console.error("Error fetching form:", err);
@@ -33,7 +33,7 @@ export default function FormDetail() {
     const handleDelete = async () => {
         if (!window.confirm("Are you sure you want to delete this form and all its responses?")) return;
 
-        await apiFetch(`http://localhost:8000/forms/${id}`, { method: 'DELETE' });
+        await apiFetch(`/forms/${id}`, { method: 'DELETE' });
         await refreshForms(); // Update sidebar
         navigate('/create'); // Send back to home
     };
@@ -52,7 +52,7 @@ export default function FormDetail() {
 
     const handleDuplicate = async () => {
         //todo: implement api call and call it
-        const res = await apiFetch(`http://localhost:8000/forms/${id}/duplicate`);
+        const res = await apiFetch(`/forms/${id}/duplicate`);
         if (res.ok) {
             const newForm = await res.json();
             navigate(`/forms/${newForm.id}/edit`);

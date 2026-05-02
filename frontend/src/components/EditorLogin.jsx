@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
+import {publicFetch} from "../utils/api.js";
 
 export default function EditorLogin() {
     const [username, setUsername] = useState('');
@@ -16,7 +17,7 @@ export default function EditorLogin() {
 
         try {
             // 2. Test the credentials by hitting the locked /forms/ route
-            const res = await fetch('http://localhost:8000/forms/', {
+            const res = await publicFetch('/forms/', {
                 headers: {
                     'Authorization': `Basic ${token}`
                 }

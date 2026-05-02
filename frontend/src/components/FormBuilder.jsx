@@ -51,7 +51,7 @@ export default function FormBuilder() {
         const fetchAndPopulate = async () => {
             setLoadingForm(true);
             try {
-                const res = await apiFetch(`http://localhost:8000/forms/${id}`);
+                const res = await apiFetch(`/forms/${id}`);
                 if (!res.ok) {
                     setError('Failed to load form for editing.');
                     return;
@@ -124,7 +124,7 @@ export default function FormBuilder() {
             );
             if (!confirmed) return;
 
-            await apiFetch(`http://localhost:8000/forms/${id}/pages/${page.id}`, {
+            await apiFetch(`/forms/${id}/pages/${page.id}`, {
                 method: 'DELETE'
             });
         }
@@ -174,12 +174,12 @@ export default function FormBuilder() {
 
             if (isLastQuestionOnPage && !isLastPage) {
                 // Delete the whole page (cascades to the question anyway)
-                await apiFetch(`http://localhost:8000/forms/${id}/pages/${pages[pageIndex].id}`, {
+                await apiFetch(`/forms/${id}/pages/${pages[pageIndex].id}`, {
                     method: 'DELETE'
                 });
             } else {
                 // Delete just the question
-                await apiFetch(`http://localhost:8000/forms/${id}/questions/${question.id}`, {
+                await apiFetch(`/forms/${id}/questions/${question.id}`, {
                     method: 'DELETE'
                 });
             }
@@ -256,14 +256,14 @@ export default function FormBuilder() {
             if (isEditing) {
                 if (hasResponses) {
                     // text-only patch 
-                    response = await apiFetch(`http://localhost:8000/forms/${id}/text`, {
+                    response = await apiFetch(`/forms/${id}/text`, {
                         method: 'PATCH',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload),
                     });
                 } else {
                     // Full structural replace (no responses to protect)
-                    response = await apiFetch(`http://localhost:8000/forms/${id}/structure`, {
+                    response = await apiFetch(`/forms/${id}/structure`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(payload),
@@ -282,7 +282,8 @@ export default function FormBuilder() {
             navigate(`/forms/${savedForm.id}`);
 
         } catch (err) {
-            setError('Network error. Is the backend running?');
+            setError('Network error. Is the backend running?' );
+            console.error(err);
         } finally {
             setIsSubmitting(false);
         }
