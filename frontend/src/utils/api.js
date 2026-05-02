@@ -3,7 +3,7 @@
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 export const apiFetch = async (url, options = {}) => {
-    const token = localStorage.getItem('teacherToken');
+    const token = localStorage.getItem('access_token');
 
     const headers = {
         'Content-Type': 'application/json',
@@ -20,7 +20,7 @@ export const apiFetch = async (url, options = {}) => {
     });
 
     if (response.status === 401) {
-        localStorage.removeItem('teacherToken');
+        localStorage.removeItem('access_token');
         const path = window.location.pathname;
         const isPublic = path.startsWith('/login') || path.startsWith('/join') || path.startsWith('/respond');
         if (!isPublic) {

@@ -1,8 +1,13 @@
+export const TOKEN_KEY = 'access_token';
 
 export function getCurrentUsername() {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem(TOKEN_KEY);
     if (!token) return null;
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    console.log(payload.sub);
-    return payload.sub;
+    try {
+        const decoded = atob(token);
+        return decoded.split(':')[0];
+    } catch (e) {
+        console.error('Failed to decode auth token:', e);
+        return null;
+    }
 }

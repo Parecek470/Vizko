@@ -11,7 +11,7 @@ export function FormProvider({ children }) {
     const fetchForms = useCallback(async () => {
         setLoading(true);
         try {
-            const token = localStorage.getItem('teacherToken');
+            const token = localStorage.getItem('access_token');
             const currentPath = window.location.pathname;
             const isPublicRoute = currentPath.startsWith('/join')|| currentPath.startsWith('/login') || currentPath.startsWith('/respond');
 
@@ -23,7 +23,7 @@ export function FormProvider({ children }) {
                 headers: token? { Authorization: `Basic ${token}` } : {}
             });
             if (response.status === 401) {
-                localStorage.removeItem('teacherToken');
+                localStorage.removeItem('access_token');
                 window.location.href = '/join';
                 return;
             }

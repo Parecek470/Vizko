@@ -25,7 +25,7 @@ export default function EditorLogin() {
 
             if (res.ok) {
                 // 3. Success! Save the token and go to the dashboard
-                localStorage.setItem('teacherToken', token);
+                localStorage.setItem('access_token', token);
                 navigate('/create');
             } else {
                 setError("Incorrect username or password");

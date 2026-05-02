@@ -8,6 +8,9 @@ import secrets
 import os
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from dotenv import load_dotenv
+from fastapi.responses import StreamingResponse
+import csv
+import io
 
 
 # my classes
@@ -55,7 +58,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-
+    expose_headers=["Content-Disposition"],
 )
 
 # 2. Dependency: This function opens a database session per request, then closes it
@@ -115,6 +118,8 @@ def replace_form_structure(form_id: int, form_data: schemas.FormCreate, db: Sess
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username and not form.is_shared:
+        raise HTTPException(status_code=403, detail="Access denied")
     if form.response_count > 0:
         raise HTTPException(status_code=400, detail="Cannot replace structure of a form that already has responses.")
 
@@ -173,6 +178,8 @@ def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Sessio
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username:
+        raise HTTPException(status_code=403, detail="Access denied")
     
     # Update only metadata
     form.title = form_update.title
@@ -221,7 +228,12 @@ def submit_form_answers(form_id: int, submission: schemas.SubmissionCreate, db: 
     db.add(db_submission)
     db.flush()
 
+    valid_question_ids = {
+    q.id for page in form.pages for q in page.questions
+}
     for ans_in in submission.answers:
+        if ans_in.question_id not in valid_question_ids:
+            raise HTTPException(status_code=400, detail="Invalid question ID")
         db_answer=models.Answer(
             submission_id=db_submission.id,
             question_id=ans_in.question_id,
@@ -244,6 +256,12 @@ def submit_form_answers(form_id: int, submission: schemas.SubmissionCreate, db: 
 def get_question_analytics(form_id: int, question_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Aggregates answer data for a specific question to feed the visualization UI."""
     
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username and not form.is_shared:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     # 1. Verify the question exists and belongs to the form
     question = db.query(models.Question).join(models.Page).filter(
         models.Question.id == question_id,
@@ -252,6 +270,7 @@ def get_question_analytics(form_id: int, question_id: int, db: Session = Depends
     
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+
     
 
     response_data = {
@@ -321,6 +340,12 @@ def get_question_analytics(form_id: int, question_id: int, db: Session = Depends
 def get_raw_answers(form_id: int, q: List[int] = Query(...), db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Fetches raw answer data, maintaining strict row-alignment with null padding for skipped questions."""
     
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username and not form.is_shared:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     submissions = db.query(models.FormSubmission).filter(
         models.FormSubmission.form_id == form_id
     ).options(
@@ -475,7 +500,7 @@ def delete_question(form_id: int, question_id: int, db: Session = Depends(get_db
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
-    if form.owner != username:
+    if question.page.form.owner != username:
         raise HTTPException(status_code=403, detail="Access denied")
 
     db.delete(question)
@@ -493,8 +518,100 @@ def delete_page(form_id: int, page_id: int, db: Session = Depends(get_db), usern
     ).first()
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
-    if form.owner != username:
+    if question.page.form.owner != username:
         raise HTTPException(status_code=403, detail="Access denied")
 
     db.delete(page)
     db.commit()
+
+@app.get("/forms/{form_id}/export/csv")
+def export_form_csv(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """Exports all form responses as a CSV file, one row per submission."""
+
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+
+    # Load all submissions with nested answers and options
+    submissions = (
+        db.query(models.FormSubmission)
+        .filter(models.FormSubmission.form_id == form_id)
+        .options(
+            joinedload(models.FormSubmission.answers)
+            .joinedload(models.Answer.selected_options)
+        )
+        .order_by(models.FormSubmission.submitted_at)
+        .all()
+    )
+
+    # Build a flat ordered list of all questions across all pages
+    questions = [
+        question
+        for page in sorted(form.pages, key=lambda p: p.page_number)
+        for question in sorted(page.questions, key=lambda q: q.order)
+    ]
+
+    # --- Build CSV in memory ---
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header row: metadata columns + one column per question
+    writer.writerow(
+        ["submitted_at"] +
+        [f"Q{i+1}: {q.text}" for i, q in enumerate(questions)]
+    )
+
+    # Data rows
+    for sub in submissions:
+        answer_map = {ans.question_id: ans for ans in sub.answers}
+
+        row = [sub.submitted_at.strftime("%Y-%m-%d %H:%M:%S")]
+
+        for q in questions:
+            ans = answer_map.get(q.id)
+            if not ans:
+                row.append("")
+            elif ans.scale_value is not None:
+                row.append(ans.scale_value)
+            elif ans.text_value is not None:
+                row.append(ans.text_value)
+            elif ans.selected_options:
+                # Join multiple choices into one cell — readable in Excel
+                row.append(" | ".join(opt.text for opt in ans.selected_options))
+            else:
+                row.append("")
+
+        writer.writerow(row)
+
+    output.seek(0)
+
+    # Sanitize form title for use in filename (remove special chars)
+    safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in form.title).strip().replace(" ", "_")
+    from datetime import date
+    filename = f"{date.today().isoformat()}_{safe_title}.csv"
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
+@app.delete("/forms/{form_id}/submissions", status_code=204)
+def delete_all_responses(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """
+    Deletes ALL submissions and their answers for a form.
+    """
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username:
+        raise HTTPException(status_code=403, detail="Only the form owner can delete responses")
+
+    deleted_count = db.query(models.FormSubmission).filter(
+        models.FormSubmission.form_id == form_id
+    ).delete(synchronize_session=False)
+
+    form.response_count = 0
+
+    db.commit()
+    return None

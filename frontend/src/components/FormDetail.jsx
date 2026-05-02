@@ -51,12 +51,30 @@ export default function FormDetail() {
     };
 
     const handleDeleteResponses = async () => {
-        if (!window.confirm("Are you sure you want to delete all responses for this form?")) return; //todo: implement api call and call it
+        if (!window.confirm("Are you sure you want to delete all responses for this form?")) return;
+        const res = await apiFetch(`/forms/${id}/submissions`, { method: 'DELETE' });
+        if (res.ok) {
+            alert("Responses deleted successfully.");
+        } else {
+            console.error("Failed to delete responses:", res.statusText);
+        }
     }
 
-    const handleExport = async () => {
-        return; //todo: implement answere format and export
-    }
+    const handleExport = () => {
+        apiFetch('/forms/${id}/export/csv').then(async (res) => {
+            if (!res.ok) return console.error("Export failed:", res.status);
+            const blob = await res.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = objectUrl;
+            // Read filename from Content-Disposition header
+            const disposition = res.headers.get('Content-Disposition');
+            const match = disposition?.match(/filename="?([^";\n]+)"?/);
+            a.download = match?.[1]?.trim() ?? `export_${id}.csv`;
+            a.click();
+            URL.revokeObjectURL(objectUrl);
+        });
+    };
 
     const handleEdit = () => {
         navigate(`/forms/${id}/edit`); //todo: implement route and fetch data
