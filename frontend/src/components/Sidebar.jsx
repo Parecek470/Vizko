@@ -17,6 +17,8 @@ import { useForms } from '../context/FormContext';
 
 export default function Sidebar() {
     const { forms, loading } = useForms();
+    const myForms = forms.filter(f => !f.is_shared);
+    const sharedForms = forms.filter(f => f.is_shared);
 
     // React Router hooks for navigation
     const navigate = useNavigate();
@@ -99,6 +101,48 @@ export default function Sidebar() {
                                 </ListItem>
                             );
                         })}
+                        {sharedForms.length > 0 && (
+                            <>
+                                <Divider sx={{ my: 1 }} />
+                                <Box sx={{ p: 2, pb: 1 }}>
+                                    <Typography variant="overline" sx={{ color: '#888', fontSize: '0.65rem' }}>
+                                        Shared Forms
+                                    </Typography>
+                                </Box>
+                                <List disablePadding>
+                                    {sharedForms.map((form) => {
+                                        const isActiveRoute = location.pathname === `/forms/${form.id}`;
+                                        return (
+                                            <ListItem key={form.id} disablePadding>
+                                                <ListItemButton
+                                                    selected={isActiveRoute}
+                                                    onClick={() => navigate(`/forms/${form.id}`)}
+                                                    sx={{
+                                                        borderLeft: isActiveRoute ? '4px solid #9c27b0' : '4px solid transparent',
+                                                        pl: 2
+                                                    }}
+                                                >
+                                                    <ListItemText
+                                                        primary={
+                                                            <Typography variant="subtitle2" sx={{ fontWeight: isActiveRoute ? 'bold' : 'normal' }}>
+                                                                {form.title}
+                                                            </Typography>
+                                                        }
+                                                        secondary={`${form.response_count} Responses`}
+                                                    />
+                                                    <Chip
+                                                        label="Shared"
+                                                        size="small"
+                                                        color="secondary"
+                                                        sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
+                                                    />
+                                                </ListItemButton>
+                                            </ListItem>
+                                        );
+                                    })}
+                                </List>
+                            </>
+                        )}
                     </List>
                 )}
             </Box>

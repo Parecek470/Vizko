@@ -24,8 +24,10 @@ export default function FormBuilder() {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [isActive, setIsActive] = useState(false);
+    const [isShared, setIsShared] = useState(false);
     const [hasResponses, setHasResponses] = useState(false);
     const [responseCount, setResponseCount] = useState(0);
+
 
 
     // --- Pages / questions state ---
@@ -248,7 +250,7 @@ export default function FormBuilder() {
         setIsSubmitting(true);
         setError(null);
 
-        const payload = { title, description, is_active: isActive, pages };
+        const payload = { title, description, is_active: isActive,is_shared:isShared, pages };
 
         try {
             let response;
@@ -269,6 +271,12 @@ export default function FormBuilder() {
                         body: JSON.stringify(payload),
                     });
                 }
+            } else {
+                response = await apiFetch('/forms', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                })
             }
 
             if (!response.ok) {
@@ -283,7 +291,6 @@ export default function FormBuilder() {
 
         } catch (err) {
             setError('Network error. Is the backend running?' );
-            console.error(err);
         } finally {
             setIsSubmitting(false);
         }
@@ -301,10 +308,11 @@ export default function FormBuilder() {
             <TextField label="Description" fullWidth variant="outlined" multiline rows={3} value={description} onChange={(e) => setDescription(e.target.value)} sx={{ mb: 2 }} />
             <FormGroup>
                 <FormControlLabel control={<Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />} label="Set as Active (Live)" />
+                <FormControlLabel control={<Switch checked={isShared} onChange={(e) => setIsShared(e.target.checked)} />} label="Share with other users" />
             </FormGroup>
             <Divider sx={{ my: 3 }} />
             <Button variant="contained" color="success" fullWidth size="large" onClick={handleSubmit} disabled={isSubmitting}>
-                {isSubmitting ? 'Saving...' : 'Save & Publish Form'}
+                {isSubmitting ? 'Saving...' : 'Save Form'}
             </Button>
         </Box>
     );

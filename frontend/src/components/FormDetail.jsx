@@ -12,6 +12,8 @@ export default function FormDetail() {
     const { id } = useParams(); // Gets the ID from the URL
     const navigate = useNavigate();
     const { refreshForms } = useForms();
+    const [isShared, setIsShared] = useState(false);
+
 
     const [form, setForm] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -20,7 +22,11 @@ export default function FormDetail() {
         const fetchFormDetail = async () => {
             try {
                 const res = await apiFetch(`/forms/${id}`);
-                if (res.ok) setForm(await res.json());
+                if (res.ok){
+                    setForm(await res.json());
+                    setIsShared(form.is_shared);
+                }
+
             } catch (err) {
                 console.error("Error fetching form:", err);
             } finally {
@@ -67,6 +73,9 @@ export default function FormDetail() {
             <Paper sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                     <Typography variant="h4">{form.title}</Typography>
+                    {form.is_shared && (
+                        <Chip label="Shared" color="secondary" size="small" sx={{ ml: 1 }} />
+                    )}
                     <Chip
                         label={form.is_active ? "Live" : "Draft"}
                         color={form.is_active ? "success" : "default"}
@@ -96,17 +105,17 @@ export default function FormDetail() {
                             Duplicate form
                         </Button>
 
-                        <Button variant="outlined" color="" startIcon={<EditIcon />} onClick={handleEdit}>
+                        <Button variant="outlined" color="" startIcon={<EditIcon />} disabled={isShared} onClick={handleEdit}>
                             Edit form
                         </Button>
                     </Box>
                     <Box sx={{minWidth:"40px"}}/>
                     <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }} >
-                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDeleteResponses}>
+                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} disabled={isShared} onClick={handleDeleteResponses}>
                             Delete Form Responses
                         </Button>
 
-                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} onClick={handleDelete}>
+                        <Button variant="outlined" color="error" startIcon={<DeleteIcon />} disabled={isShared} onClick={handleDelete}>
                             Delete Form
                         </Button>
 

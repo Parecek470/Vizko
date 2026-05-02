@@ -36,6 +36,7 @@ class FormCreate(BaseModel):
     title: str
     description: Optional[str] = None
     is_active: bool = False
+    is_shared: bool = False
     # The React app will send the whole nested structure at once
     pages: List[PageCreate] = []
 
@@ -77,6 +78,7 @@ class FormSummaryResponse(BaseModel):
     title: str
     is_active: bool
     response_count: int
+    is_shared: bool
     model_config = ConfigDict(from_attributes=True)
 
 class FormDetailResponse(BaseModel):
@@ -86,6 +88,7 @@ class FormDetailResponse(BaseModel):
     is_active: bool
     join_code: str
     response_count: int
+    is_shared: bool
     pages: List[PageResponse]
     model_config = ConfigDict(from_attributes=True)
 
