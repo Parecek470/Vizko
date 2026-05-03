@@ -1,0 +1,32 @@
+# /docker-compose.yml
+
+services:
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: polling_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Maps a local folder called 'sqlite_data' to the container.
+      # This ensures your thesis data isn't wiped if the container restarts.
+      - ./sqlite_data:/app/data
+      - ./backend:/app
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: build
+    container_name: polling_frontend
+    command: npm run dev
+    ports:
+      - "80:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    restart: unless-stopped
