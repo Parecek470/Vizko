@@ -30,7 +30,7 @@ export default function QuestionVisualizer({ formId, question, groupByQuestionId
                 }
                 // Call the new universal raw-answers endpoint
                 const response = await apiFetch(
-                    `http://localhost:8000/forms/${formId}/analytics/raw-answers${queryParams}`
+                    `/forms/${formId}/analytics/raw-answers${queryParams}`
                 );
                 const json = await response.json();
 

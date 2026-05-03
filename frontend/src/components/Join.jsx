@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
+import {publicFetch} from "../utils/api.js";
 
 export default function Join() {
     const [code, setCode] = useState('');
@@ -10,7 +11,7 @@ export default function Join() {
     const handleJoin = async (e) => {
         e.preventDefault();
         try {
-            const res = await fetch(`http://localhost:8000/join/${code}`);
+            const res = await publicFetch(`/join/${code}`);
             if (res.ok) {
                 navigate(`/respond/${code}`);
             } else {

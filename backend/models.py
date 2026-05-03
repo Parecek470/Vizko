@@ -15,7 +15,10 @@ class Form(Base):
     is_active = Column(Boolean, default=False)
     
     # We will generate this in FastAPI, so the user doesn't have to
-    join_code = Column(String, unique=True, index=True) 
+    join_code = Column(String, unique=True, index=True)
+
+    owner = Column(String, nullable=False, default="unknown")
+    is_shared = Column(Boolean, default=False) 
 
     # cascade="all, delete-orphan" means if a teacher deletes a Form, 
     # it automatically deletes all Pages and Questions inside it.

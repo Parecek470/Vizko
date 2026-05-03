@@ -26,7 +26,10 @@ load_dotenv()
 security = HTTPBasic()
 
 TEACHER_ACCOUNTS = {
-    "test": os.getenv("TEST_TEACHER_PASSWORD", "fall1")
+    "test": os.getenv("TEST_PASSWORD", "fall"),
+    "test1": os.getenv("TEST1_PASSWORD", "fall1"),
+    "test2": os.getenv("TEST2_PASSWORD", "fall2")
+
 }
 
 def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
@@ -72,7 +75,7 @@ def get_db():
 @app.get("/forms/", response_model=List[schemas.FormSummaryResponse])
 def get_all_forms(db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Fetches a lightweight list of all forms."""
-    forms = db.query(models.Form).all()
+    forms = db.query(models.Form).filter((models.Form.owner == username)|(models.Form.is_shared)).all()
     return forms
 
 # 2. THE DETAIL ROUTE (For the Main Dashboard View)
@@ -86,35 +89,68 @@ def get_form_detail(form_id: int, db: Session = Depends(get_db), username: str =
     
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
-        
+    if form.owner != username and not form.is_shared:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     return form
 
 @app.post("/forms/", response_model=schemas.FormDetailResponse)
 def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
-    """Creates a new form."""
-    unique_code = utils.get_unique_join_code(db)
-
     db_form = models.Form(
-        title = form_data.title,
-        description = form_data.description,
-        join_code = unique_code,
-        is_active = form_data.is_active
+        title=form_data.title,
+        description=form_data.description,
+        join_code=utils.get_unique_join_code(db),
+        is_active=form_data.is_active,
+        owner=username,
+        is_shared=form_data.is_shared,
     )
-
     db.add(db_form)
     db.flush()
 
-    # Get pages into form
-    for page_in in form_data.pages:
+    _build_pages_for_form(db_form.id, form_data.pages, db)  # ← shared
+
+    db.commit()
+    db.refresh(db_form)
+    return db_form
+
+
+@app.put("/forms/{form_id}/structure", response_model=schemas.FormDetailResponse)
+def replace_form_structure(form_id: int, form_data: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username and not form.is_shared:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if form.response_count > 0:
+        raise HTTPException(status_code=400, detail="Cannot replace structure of a form that already has responses.")
+
+    form.title = form_data.title
+    form.description = form_data.description
+    form.is_active = form_data.is_active
+    form.is_shared = form_data.is_shared
+
+    for page in list(form.pages):
+        db.delete(page)
+    db.flush()
+
+    _build_pages_for_form(form.id, form_data.pages, db)  # ← shared
+
+    db.commit()
+    db.refresh(form)
+    return form
+
+# Helper — not a route, just a plain function
+def _build_pages_for_form(form_id: int, pages_data, db: Session):
+    """Inserts pages, questions, and options for a given form_id."""
+    for page_in in pages_data:
         db_page = models.Page(
-            form_id=db_form.id,
+            form_id=form_id,
             page_number=page_in.page_number,
             title=page_in.title
         )
         db.add(db_page)
         db.flush()
 
-        # get questions into page
         for q_in in page_in.questions:
             db_question = models.Question(
                 page_id=db_page.id,
@@ -128,24 +164,14 @@ def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db), us
                 scale_max_label=q_in.scale_max_label
             )
             db.add(db_question)
-            db.flush() # Gets the db_question.id
+            db.flush()
 
-            # 5. Unpack and attach the Options (if any)
             for opt_in in q_in.options:
-                db_option = models.QuestionOption(
+                db.add(models.QuestionOption(
                     question_id=db_question.id,
                     text=opt_in.text,
                     order=opt_in.order
-                )
-                db.add(db_option)
-            
-    db.commit()
-    db.refresh(db_form)
-
-
-    return db_form
-
-# Add to backend/main.py
+                ))
 
 @app.put("/forms/{form_id}", response_model=schemas.FormSummaryResponse)
 def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
@@ -153,7 +179,9 @@ def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Sessio
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
-    
+    if form.owner != username:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     # Update only metadata
     form.title = form_update.title
     form.description = form_update.description
@@ -169,7 +197,9 @@ def delete_form(form_id: int, db: Session = Depends(get_db), username: str = Dep
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
-        
+    if form.is_shared or form.owner != username:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     db.delete(form)
     db.commit()
     return None
@@ -199,7 +229,12 @@ def submit_form_answers(form_id: int, submission: schemas.SubmissionCreate, db: 
     db.add(db_submission)
     db.flush()
 
+    valid_question_ids = {
+    q.id for page in form.pages for q in page.questions
+}
     for ans_in in submission.answers:
+        if ans_in.question_id not in valid_question_ids:
+            raise HTTPException(status_code=400, detail="Invalid question ID")
         db_answer=models.Answer(
             submission_id=db_submission.id,
             question_id=ans_in.question_id,
@@ -222,6 +257,12 @@ def submit_form_answers(form_id: int, submission: schemas.SubmissionCreate, db: 
 def get_question_analytics(form_id: int, question_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Aggregates answer data for a specific question to feed the visualization UI."""
     
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username and not form.is_shared:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     # 1. Verify the question exists and belongs to the form
     question = db.query(models.Question).join(models.Page).filter(
         models.Question.id == question_id,
@@ -230,6 +271,8 @@ def get_question_analytics(form_id: int, question_id: int, db: Session = Depends
     
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+
+
 
     response_data = {
         "question_id": question.id,
@@ -298,6 +341,12 @@ def get_question_analytics(form_id: int, question_id: int, db: Session = Depends
 def get_raw_answers(form_id: int, q: List[int] = Query(...), db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Fetches raw answer data, maintaining strict row-alignment with null padding for skipped questions."""
     
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username and not form.is_shared:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     submissions = db.query(models.FormSubmission).filter(
         models.FormSubmission.form_id == form_id
     ).options(
@@ -345,6 +394,8 @@ def duplicate_form(form_id: int, db: Session = Depends(get_db), username: str = 
     original_form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not original_form:
         raise HTTPException(status_code=404, detail="Form not found")
+    if not original_form.is_shared and original_form.owner != username:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     # 2. Create the new Form — fresh join_code, title with "(copy)", inactive by default
     new_form = models.Form(
@@ -352,6 +403,8 @@ def duplicate_form(form_id: int, db: Session = Depends(get_db), username: str = 
         description=original_form.description,
         join_code=utils.get_unique_join_code(db),
         is_active=False,  # copies start as inactive — safer default
+        owner=username,
+        is_shared=False,
     )
     db.add(new_form)
     db.flush()  # populates new_form.id without committing yet
@@ -407,6 +460,8 @@ def patch_form_text(form_id: int, form_data: schemas.FormCreate, db: Session = D
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     # Update metadata
     form.title = form_data.title
@@ -446,6 +501,8 @@ def delete_question(form_id: int, question_id: int, db: Session = Depends(get_db
     question = db.query(models.Question).filter(models.Question.id == question_id).first()
     if not question:
         raise HTTPException(status_code=404, detail="Question not found")
+    if question.page.form.owner != username:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     db.delete(question)
     db.commit()
@@ -462,57 +519,11 @@ def delete_page(form_id: int, page_id: int, db: Session = Depends(get_db), usern
     ).first()
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
+    if question.page.form.owner != username:
+        raise HTTPException(status_code=403, detail="Access denied")
 
     db.delete(page)
     db.commit()
-
-@app.put("/forms/{form_id}/structure", response_model=schemas.FormDetailResponse)
-def update_form_structure(form_id: int, form_data: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
-    """Replaces a form's full structure (pages, questions, options). Does not touch submissions."""
-    form = db.query(models.Form).filter(models.Form.id == form_id).first()
-    if not form:
-        raise HTTPException(status_code=404, detail="Form not found")
-
-    # Update metadata
-    form.title = form_data.title
-    form.description = form_data.description
-    form.is_active = form_data.is_active
-
-    # Wipe and rebuild all pages/questions/options (submissions are untouched)
-    for page in form.pages:
-        db.delete(page)
-    db.flush()
-
-    for page_in in form_data.pages:
-        db_page = models.Page(form_id=form.id, page_number=page_in.page_number, title=page_in.title)
-        db.add(db_page)
-        db.flush()
-        for q_in in page_in.questions:
-            db_question = models.Question(
-                page_id=db_page.id, text=q_in.text, is_required=q_in.is_required,
-                question_type=q_in.question_type.value, order=q_in.order,
-                scale_min=q_in.scale_min, scale_max=q_in.scale_max,
-                scale_min_label=q_in.scale_min_label, scale_max_label=q_in.scale_max_label
-            )
-            db.add(db_question)
-            db.flush()
-            for opt_in in q_in.options:
-                db.add(models.QuestionOption(question_id=db_question.id, text=opt_in.text, order=opt_in.order))
-
-    db.commit()
-    db.refresh(form)
-    return form
-
-@app.delete("/forms/{form_id}/responses", status_code=204)
-def delete_form_responses(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
-    """Deletes all submissions (and their answers) for a form, keeping the form itself intact."""
-    form = db.query(models.Form).filter(models.Form.id == form_id).first()
-    if not form:
-        raise HTTPException(status_code=404, detail="Form not found")
-
-    db.query(models.FormSubmission).filter(models.FormSubmission.form_id == form_id).delete()
-    db.commit()
-
 
 @app.get("/forms/{form_id}/export/csv")
 def export_form_csv(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
@@ -547,7 +558,7 @@ def export_form_csv(form_id: int, db: Session = Depends(get_db), username: str =
 
     # Header row: metadata columns + one column per question
     writer.writerow(
-        ["submitted_at"] +  # ← removed submission_id
+        ["submitted_at"] +
         [f"Q{i+1}: {q.text}" for i, q in enumerate(questions)]
     )
 
@@ -577,7 +588,7 @@ def export_form_csv(form_id: int, db: Session = Depends(get_db), username: str =
 
     # Sanitize form title for use in filename (remove special chars)
     safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in form.title).strip().replace(" ", "_")
-    
+    from datetime import date
     filename = f"{date.today().isoformat()}_{safe_title}.csv"
 
     return StreamingResponse(
@@ -585,3 +596,22 @@ def export_form_csv(form_id: int, db: Session = Depends(get_db), username: str =
         media_type="text/csv",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+@app.delete("/forms/{form_id}/submissions", status_code=204)
+def delete_all_responses(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    """
+    Deletes ALL submissions and their answers for a form.
+    """
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username:
+        raise HTTPException(status_code=403, detail="Only the form owner can delete responses")
+
+    deleted_count = db.query(models.FormSubmission).filter(
+        models.FormSubmission.form_id == form_id
+    ).delete(synchronize_session=False)
+
+
+    db.commit()
+    return None

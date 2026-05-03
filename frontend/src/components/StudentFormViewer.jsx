@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Box, Typography, Paper, Button, CircularProgress, RadioGroup, FormControlLabel, Radio, Checkbox, FormGroup, TextField, Slider, Tooltip } from '@mui/material';
+import {publicFetch} from "../utils/api.js";
 
 export default function StudentFormViewer() {
     const { code } = useParams();
@@ -15,7 +16,7 @@ export default function StudentFormViewer() {
 
     useEffect(() => {
         const fetchForm = async () => {
-            const res = await fetch(`http://localhost:8000/join/${code}`);
+            const res = await publicFetch(`/join/${code}`);
             if (res.ok) setForm(await res.json());
             setLoading(false);
         };
@@ -40,14 +41,14 @@ export default function StudentFormViewer() {
         // Transform our dictionary state into the list required by SubmissionCreate schema
         const payload = {
             answers: Object.entries(answers).map(([qId, ans]) => ({
-                question_id: parseInt(qId),
-                text_value: ans.text_value || null,
-                scale_value: ans.scale_value || null,
+                question_id: parseInt(qId, ),
+                text_value: ans.text_value ?? null,
+                scale_value: ans.scale_value ?? null,
                 selected_option_ids: ans.selected_option_ids || []
             }))
         };
 
-        const res = await fetch(`http://localhost:8000/forms/${form.id}/submissions`, {
+        const res = await publicFetch(`/forms/${form.id}/submissions`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
@@ -131,15 +132,50 @@ export default function StudentFormViewer() {
                         {/* SCALE */}
                         {q.question_type === 'scale' && (
                             <Box sx={{ px: 2 }}>
-                                <Slider
-                                    min={q.scale_min} max={q.scale_max} step={1} marks valueLabelDisplay="auto"
-                                    value={answers[q.id]?.scale_value || q.scale_min}
-                                    onChange={(e, val) => handleAnswerChange(q.id, { scale_value: val })}
-                                />
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                    <Typography variant="caption">{q.scale_min_label}</Typography>
-                                    <Typography variant="caption">{q.scale_max_label}</Typography>
-                                </Box>
+                                {answers[q.id]?.scale_value == null ? (
+                                    // Unanswered state — show a soft prompt instead of a pre-positioned slider
+                                    <Box
+                                        sx={{
+                                            border: '2px dashed #bdbdbd',
+                                            borderRadius: 2,
+                                            p: 3,
+                                            textAlign: 'center',
+                                            cursor: 'pointer',
+                                            '&:hover': { borderColor: '#1976d2', bgcolor: '#f0f7ff' },
+                                            transition: 'all 0.2s ease'
+                                        }}
+                                        onClick={() => handleAnswerChange(q.id, { scale_value: q.scale_min })}
+                                    >
+                                        <Typography variant="body2" color="text.secondary">
+                                            Click to answer — scale {q.scale_min} to {q.scale_max}
+                                        </Typography>
+                                    </Box>
+                                ) : (
+                                    // Answered state — show the slider + clear button
+                                    <>
+                                        <Slider
+                                            min={q.scale_min}
+                                            max={q.scale_max}
+                                            step={1}
+                                            marks
+                                            valueLabelDisplay="auto"
+                                            value={answers[q.id].scale_value}
+                                            onChange={(e, val) => handleAnswerChange(q.id, { scale_value: val })}
+                                        />
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                            <Typography variant="caption">{q.scale_min_label}</Typography>
+                                            <Button
+                                                size="small"
+                                                color="inherit"
+                                                sx={{ fontSize: '0.7rem', color: 'text.secondary' }}
+                                                onClick={() => handleAnswerChange(q.id, { scale_value: null })}
+                                            >
+                                                Clear answer
+                                            </Button>
+                                            <Typography variant="caption">{q.scale_max_label}</Typography>
+                                        </Box>
+                                    </>
+                                )}
                             </Box>
                         )}
                     </Box>
