@@ -1,4 +1,26 @@
-FROM ubuntu:latest
-LABEL authors="marek"
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: polling_backend
+    env_file:
+      - ./backend/.env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./sqlite_data:/app/data
+    restart: unless-stopped
 
-ENTRYPOINT ["top", "-b"]
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: polling_frontend
+    env_file:
+      - ./frontend/.env
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

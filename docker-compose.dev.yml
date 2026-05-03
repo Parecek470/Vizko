@@ -1,27 +1,30 @@
-# /docker-compose.yml
-
 services:
   backend:
-    build: 
+    build:
       context: ./backend
       dockerfile: Dockerfile
-    container_name: polling_backend
+    container_name: polling_backend_dev
+    environment:
+      - TESTER_PASSWORD=test
+      - TESTER1_PASSWORD=test1
+      - TESTER2_PASSWORD=test2
     ports:
       - "8000:8000"
     volumes:
-      # Maps a local folder called 'sqlite_data' to the container.
-      # This ensures your thesis data isn't wiped if the container restarts.
       - ./sqlite_data:/app/data
-      - ./backend:/app
+      - ./backend:/app        # hot reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: build
-    container_name: polling_frontend
-    command: npm run dev
+      target: build           # stop at build stage
+    container_name: polling_frontend_dev
+    command: npm run dev -- --host
+    environment:
+      - VITE_API_URL=http://localhost:8000
     ports:
       - "80:5173"
     volumes:

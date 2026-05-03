@@ -70,7 +70,6 @@ export default function Sidebar() {
                 ) : (
                     <List disablePadding>
                         {myForms.map((form) => {
-                            // Check if the current URL matches this form to highlight the active tab
                             const isActiveRoute = location.pathname === `/forms/${form.id}`;
 
                             return (
@@ -88,11 +87,11 @@ export default function Sidebar() {
                                                 <Typography
                                                     variant="subtitle2"
                                                     sx={{
-                                                        fontWeight: 600,  // Always semibold — never changes width
+                                                        fontWeight: 600,
                                                         color: isActiveRoute ? 'primary.main' : 'text.primary',
                                                         overflow: 'hidden',
                                                         textOverflow: 'ellipsis',
-                                                        whiteSpace: 'nowrap',  // Bonus: prevents long titles from wrapping and reflowing too
+                                                        whiteSpace: 'nowrap',
                                                     }}
                                                 >
                                                     {form.title}

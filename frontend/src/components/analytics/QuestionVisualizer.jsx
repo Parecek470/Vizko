@@ -65,14 +65,13 @@ export default function QuestionVisualizer({ formId, question, groupByQuestionId
                 }
                 setRawData(formattedSeries);
 
-                // Auto-compute Silverman's rule of thumb bandwidth from all numeric values
+                // Compute Silverman's rule of thumb bandwidth
                 const allValues = formattedSeries.flatMap(s => s.data).filter(v => typeof v === 'number');
                 if (allValues.length > 1) {
                     const n = allValues.length;
                     const mean = allValues.reduce((a, b) => a + b, 0) / n;
                     const variance = allValues.reduce((a, b) => a + (b - mean) ** 2, 0) / n;
                     const std = Math.sqrt(variance);
-                    // Silverman: h = 0.9 * σ * n^(-1/5)
                     const silverman = 0.9 * std * Math.pow(n, -0.2);
                     setKdeBandwidth(parseFloat(silverman.toFixed(3)));
                 }

@@ -26,9 +26,9 @@ load_dotenv()
 security = HTTPBasic()
 
 TEACHER_ACCOUNTS = {
-    "test": os.getenv("TEST_PASSWORD", "fall"),
-    "test1": os.getenv("TEST1_PASSWORD", "fall1"),
-    "test2": os.getenv("TEST2_PASSWORD", "fall2")
+    "tester": os.getenv("TESTER_PASSWORD"),
+    "tester1": os.getenv("TESTER1_PASSWORD"),
+    "tester2": os.getenv("TESTER_PASSWORD")
 
 }
 
@@ -119,7 +119,7 @@ def replace_form_structure(form_id: int, form_data: schemas.FormCreate, db: Sess
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
-    if form.owner != username and not form.is_shared:
+    if form.owner != username:
         raise HTTPException(status_code=403, detail="Access denied")
     if form.response_count > 0:
         raise HTTPException(status_code=400, detail="Cannot replace structure of a form that already has responses.")
@@ -197,7 +197,7 @@ def delete_form(form_id: int, db: Session = Depends(get_db), username: str = Dep
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
         raise HTTPException(status_code=404, detail="Form not found")
-    if form.is_shared or form.owner != username:
+    if form.is_shared and form.owner != username:
         raise HTTPException(status_code=403, detail="Access denied")
 
     db.delete(form)

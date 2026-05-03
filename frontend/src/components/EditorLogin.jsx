@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
 import {publicFetch} from "../utils/api.js";
+import {useForms} from "../context/FormContext.jsx";
 
 export default function EditorLogin() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const { refreshForms } = useForms();
 
     const handleLogin = async (e) => {
         e.preventDefault();
@@ -22,10 +24,10 @@ export default function EditorLogin() {
                     'Authorization': `Basic ${token}`
                 }
             });
-
             if (res.ok) {
                 // 3. Success! Save the token and go to the dashboard
                 localStorage.setItem('access_token', token);
+                await refreshForms();
                 navigate('/create');
             } else {
                 setError("Incorrect username or password");

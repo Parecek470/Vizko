@@ -101,18 +101,25 @@ export default function FormDetail() {
             <Paper sx={{ p: 4 }}>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
                     <Typography variant="h4">{form.title}</Typography>
-                    {form.is_shared && (
-                        <Chip label="Shared" color="secondary" size="small" sx={{ ml: 1 }} />
-                    )}
-                    <Chip
-                        label={`${form.response_count} Responses`}
-                        color="primary"
-                        variant="outlined"
-                    />
-                    <Chip
-                        label={form.is_active ? "Live" : "Draft"}
-                        color={form.is_active ? "success" : "default"}
-                    />
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                        {form.is_shared && (
+                            <Chip label="Shared" color="secondary" size="medium" sx={{ ml: 1 }} />
+                        )}
+                        <Box sx={{ display: 'flex', flexDirection:'column', gap: 1 }}>
+                            <Chip
+                                label={form.is_active ? "Live" : "Draft"}
+                                color={form.is_active ? "success" : "default"}
+                            />
+                            <Chip
+                                label={`${form.response_count} Responses`}
+                                color="primary"
+                                variant="outlined"
+                            />
+
+                        </Box>
+                    </Box>
+
+
                 </Box>
 
                 <Typography color="text.secondary" paragraph>
@@ -123,27 +130,35 @@ export default function FormDetail() {
                     Join Code: <strong>{form.join_code}</strong>
                 </Typography>
 
-                <Box sx={{ mt: 4, display: 'flex', gap: 2 }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <Button variant="contained" color="secondary" onClick={()=>navigate(`/forms/${id}/analytics`)}>
-                            View Analytics Dashboard
-                        </Button>
-                        <Button variant="contained" color="primary" startIcon={<DownloadIcon />} onClick={handleExport}>
-                            Export to csv
-                        </Button>
+                <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
+
+
+
+                    {/* Right Side: Safe Actions */}
+                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Button variant="contained" color="secondary" onClick={() => navigate(`/forms/${id}/analytics`)}>
+                                View Analytics Dashboard
+                            </Button>
+                            <Button variant="contained" color="primary" startIcon={<DownloadIcon />} onClick={handleExport}>
+                                Export to csv
+                            </Button>
+                        </Box>
+
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Button variant="outlined" startIcon={<CopyAllIcon />} onClick={handleDuplicate}>
+                                Duplicate form
+                            </Button>
+
+                            <Button variant="outlined" startIcon={<EditIcon />} disabled={isReadOnly} onClick={handleEdit}>
+                                Edit form
+                            </Button>
+                        </Box>
                     </Box>
 
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        <Button variant="outlined" color="" startIcon={<CopyAllIcon />} onClick={handleDuplicate}>
-                            Duplicate form
-                        </Button>
-
-                        <Button variant="outlined" color="" startIcon={<EditIcon />} disabled={isReadOnly} onClick={handleEdit}>
-                            Edit form
-                        </Button>
-                    </Box>
-                    <Box sx={{minWidth:"40px"}}/>
-                    <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }} >
+                    {/* Left Side: Destructive Actions */}
+                    <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column' }}>
                         <Button variant="outlined" color="error" startIcon={<DeleteIcon />} disabled={isReadOnly} onClick={handleDeleteResponses}>
                             Delete Form Responses
                         </Button>
@@ -151,7 +166,6 @@ export default function FormDetail() {
                         <Button variant="outlined" color="error" startIcon={<DeleteIcon />} disabled={isReadOnly} onClick={handleDelete}>
                             Delete Form
                         </Button>
-
                     </Box>
                 </Box>
             </Paper>

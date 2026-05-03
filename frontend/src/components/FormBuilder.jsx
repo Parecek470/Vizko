@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import {useState, useEffect, useRef} from 'react';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import {
     Box, Typography, Paper, TextField, Switch, FormGroup,
     FormControlLabel, Button, Alert, Card, CardContent,
     IconButton, Select, MenuItem, InputLabel, FormControl,
-    Grid, Divider, CircularProgress, Fab, Tooltip, Chip
+    Grid, Divider, CircularProgress, Fab, Tooltip, Chip, Collapse
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
@@ -14,6 +14,7 @@ import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked';
 import CheckBoxIcon from '@mui/icons-material/CheckBox';
 import ShortTextIcon from '@mui/icons-material/ShortText';
 import LinearScaleIcon from '@mui/icons-material/LinearScale';
+import CloseIcon from '@mui/icons-material/Close';
 import { useForms } from '../context/FormContext';
 import { apiFetch } from '../utils/api.js';
 
@@ -42,6 +43,8 @@ export default function FormBuilder() {
     const [error, setError] = useState(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [loadingForm, setLoadingForm] = useState(false);
+    const [savePanelOpen, setSavePanelOpen] = useState(false);
+    const savePanelRef = useRef(null);
 
     useEffect(() => {
         if (!isEditing || !id) return;
@@ -96,6 +99,15 @@ export default function FormBuilder() {
 
         fetchAndPopulate();
     }, [isEditing, id]);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (savePanelRef.current && !savePanelRef.current.contains(e.target))
+                setSavePanelOpen(false);
+        };
+        if (savePanelOpen) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [savePanelOpen]);
 
     const handleAddPage = () => {
         const newPages = [...pages, { page_number: pages.length + 1, title: '', questions: [] }];
@@ -352,17 +364,7 @@ export default function FormBuilder() {
                     label="Share with other users"
                 />
             </FormGroup>
-            <Divider sx={{ my: 3 }} />
-            <Button
-                variant="contained"
-                color="success"
-                fullWidth
-                size="large"
-                onClick={handleSubmit}
-                disabled={isSubmitting}
-            >
-                {isSubmitting ? 'Saving...' : 'Save Form'}
-            </Button>
+
         </Box>
     );
 
@@ -674,23 +676,38 @@ export default function FormBuilder() {
                 {renderEditorPanel()}
             </Box>
 
-            <Tooltip title={isSubmitting ? 'Saving...' : 'Save form'}>
-                <span>
-                    <Fab
-                        color="success"
-                        onClick={handleSubmit}
-                        disabled={isSubmitting}
-                        sx={{
-                            position: 'fixed',
-                            bottom: 24,
-                            right: 24,
-                            zIndex: 1300
-                        }}
-                    >
-                        <SaveIcon />
-                    </Fab>
-                </span>
-            </Tooltip>
+            <Box ref={savePanelRef} sx={{ position: 'fixed', bottom: 24, right: 24, zIndex: 1300,
+                display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+
+                <Collapse in={savePanelOpen} timeout={200}>
+                    <Paper elevation={6} sx={{ p: 2, mb: 1, borderRadius: 3, minWidth: 240 }}>
+                        <Typography variant="subtitle2">Publish Options</Typography>
+
+                        <Tooltip title="Allow users to send responses" placement="left" arrow>
+                            <FormControlLabel control={
+                                <Switch checked={isActive} onChange={(e) => setIsActive(e.target.checked)} color="success" size="small" />
+                            } label="Make Live" />
+                        </Tooltip>
+
+                        <Tooltip title="Allows other creators to view responses and duplicate this form" placement="left" arrow>
+                            <FormControlLabel control={
+                                <Switch checked={isShared} onChange={(e) => setIsShared(e.target.checked)} size="small" />
+                            } label="Share with others" />
+                        </Tooltip>
+
+                        <Divider sx={{ my: 0.5 }} />
+
+                        <Button variant="contained" color="success" fullWidth onClick={handleSubmit}
+                                startIcon={<SaveIcon />}>
+                            Save & Exit
+                        </Button>
+                    </Paper>
+                </Collapse>
+
+                <Fab color={savePanelOpen ? 'default' : 'success'} onClick={() => setSavePanelOpen(p => !p)}>
+                    {savePanelOpen ? <CloseIcon /> : <SaveIcon />}
+                </Fab>
+            </Box>
         </Box>
     );
 }

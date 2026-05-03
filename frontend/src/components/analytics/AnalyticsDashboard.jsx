@@ -37,10 +37,10 @@ export default function AnalyticsDashboard() {
                     const data = await res.json();
                     setForm(data);
                     if (data.pages?.[0]?.questions?.[0]) {
+                        setOpenPages({ [data.pages[0].id]: true });
                         setSelectedQuestion(data.pages[0].questions[0]);
                     }
                 } else {
-                    // 2. Handle HTTP errors (e.g., 404 Form Not Found)
                     setError("Form not found or server error.");
                 }
             } catch (err) {
@@ -62,7 +62,7 @@ export default function AnalyticsDashboard() {
     return (
         <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
             <Paper elevation={2} sx={{ width: '20vh', overflowY: 'auto', borderRadius: 0 }}>
-                <Box sx={{ p: 2, bgcolor: 'primary.main', color: 'white' }}>
+                <Box sx={{ p: 2, bgcolor: 'primary.dark', color: 'white' }}>
                         <Link
                             component={RouterLink}
                             to={`/forms/${id}`}
