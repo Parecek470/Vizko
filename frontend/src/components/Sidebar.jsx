@@ -35,7 +35,7 @@ export default function Sidebar() {
                 borderRight: '1px solid #e0e0e0',
                 display: 'flex',
                 flexDirection: 'column',
-                height: '100%' // Fills the vertical space provided by App.jsx
+                height: '100%'
             }}
         >
             {/* Sidebar Header & Action Button */}
