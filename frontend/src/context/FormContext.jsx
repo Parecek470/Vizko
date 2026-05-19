@@ -13,9 +13,8 @@ export function FormProvider({ children }) {
         try {
             const token = localStorage.getItem('access_token');
             const currentPath = window.location.pathname;
-            const isPublicRoute = currentPath.startsWith('/join')|| currentPath.startsWith('/login') || currentPath.startsWith('/respond');
 
-            if(!token && isPublicRoute) {
+            if(!token) {
                 setLoading(false);
                 return;
             }

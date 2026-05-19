@@ -33,18 +33,12 @@ TEACHER_ACCOUNTS = {
 }
 
 def get_current_username(credentials: HTTPBasicCredentials = Depends(security)):
-    if credentials.username not in TEACHER_ACCOUNTS:
+    account_password = TEACHER_ACCOUNTS.get(credentials.username)
+
+    if not account_password or not secrets.compare_digest(credentials.password, account_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    
-    if not secrets.compare_digest(credentials.password, TEACHER_ACCOUNTS[credentials.username]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid username or password",
-            headers={"WWW-Authenticate": "Basic"},
         )
     return credentials.username
 
@@ -223,23 +217,116 @@ def submit_form_answers(form_id: int, submission: schemas.SubmissionCreate, db: 
     """Submits answers for a specific form."""
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form or not form.is_active:
-        raise HTTPException(status_code=400, detail="Invalid or incactive form.")
+        raise HTTPException(status_code=400, detail="Invalid or inactive form.")
 
-    db_submission = models.FormSubmission(form_id = form.id)
+
+    # Build a lookup map: question_id -> Question object for every question on this form
+    question_map = {
+        q.id: q
+        for page in form.pages
+        for q in page.questions
+    }
+    # --- Validate the submission before writing anything ---
+    # 1. Reject duplicate question IDs in the same submission
+    submitted_ids = [ans.question_id for ans in submission.answers]
+    if len(submitted_ids) != len(set(submitted_ids)):
+        raise HTTPException(status_code=400, detail="Duplicate question IDs in submission.")
+    # 2. All submitted question IDs must belong to this form
+    for ans_in in submission.answers:
+        if ans_in.question_id not in question_map:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Question ID {ans_in.question_id} does not belong to this form."
+            )
+        
+    # 3. Required questions must have an answer
+    answered_ids = set(submitted_ids)
+    for q in question_map.values():
+        if q.is_required and q.id not in answered_ids:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Question '{q.text}' is required but was not answered."
+            )
+        
+    # 4. Per-answer type validation
+    for ans_in in submission.answers:
+        q = question_map[ans_in.question_id]
+        qtype = q.question_type.value if hasattr(q.question_type, 'value') else q.question_type
+
+        
+        if qtype == "text_open":
+            if ans_in.scale_value is not None or ans_in.selected_option_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Question '{q.text}' is a text question; do not send scale or option data."
+                )
+            # Required text questions must have a non-empty value
+            if q.is_required and (not ans_in.text_value or not ans_in.text_value.strip()):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Question '{q.text}' is required and expects a non-empty text answer."
+                )
+
+        elif qtype == "scale":
+            # Must not send text or option data for a scale question
+            if ans_in.text_value is not None or ans_in.selected_option_ids:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Question '{q.text}' is a scale question; do not send text or option data."
+                )
+            # If a value is provided, it must be within the defined range
+            if ans_in.scale_value is not None:
+                if not (q.scale_min <= ans_in.scale_value <= q.scale_max):
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Scale value {ans_in.scale_value} is out of range "
+                               f"[{q.scale_min}, {q.scale_max}] for question '{q.text}'."
+                    )
+            # Required scale questions must have a value
+            elif q.is_required:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Question '{q.text}' is required and expects a scale value."
+                )
+        elif qtype in ("single_choice", "multiple_choice"):
+            # Must not send text or scale data for a choice question
+            if ans_in.text_value is not None or ans_in.scale_value is not None:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Question '{q.text}' is a choice question; do not send text or scale data."
+                )
+            if ans_in.selected_option_ids:
+                # Single choice must have exactly one option
+                if qtype == "single_choice" and len(ans_in.selected_option_ids) != 1:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Question '{q.text}' is single-choice; exactly one option must be selected."
+                    )
+                # All submitted option IDs must actually belong to this question
+                valid_option_ids = {opt.id for opt in q.options}
+                for opt_id in ans_in.selected_option_ids:
+                    if opt_id not in valid_option_ids:
+                        raise HTTPException(
+                            status_code=400,
+                            detail=f"Option ID {opt_id} does not belong to question '{q.text}'."
+                        )
+            elif q.is_required:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Question '{q.text}' is required and expects at least one selected option."
+                )
+
+    db_submission = models.FormSubmission(form_id=form.id)
     db.add(db_submission)
     db.flush()
 
-    valid_question_ids = {
-    q.id for page in form.pages for q in page.questions
-}
     for ans_in in submission.answers:
-        if ans_in.question_id not in valid_question_ids:
-            raise HTTPException(status_code=400, detail="Invalid question ID")
-        db_answer=models.Answer(
+        q = question_map[ans_in.question_id]
+        db_answer = models.Answer(
             submission_id=db_submission.id,
             question_id=ans_in.question_id,
-            text_value=ans_in.text_value,
-            scale_value=ans_in.scale_value
+            text_value=ans_in.text_value if ans_in.text_value and ans_in.text_value.strip() else None,
+            scale_value=ans_in.scale_value,
         )
         db.add(db_answer)
         db.flush()
@@ -519,7 +606,7 @@ def delete_page(form_id: int, page_id: int, db: Session = Depends(get_db), usern
     ).first()
     if not page:
         raise HTTPException(status_code=404, detail="Page not found")
-    if question.page.form.owner != username:
+    if page.form.owner != username:
         raise HTTPException(status_code=403, detail="Access denied")
 
     db.delete(page)
@@ -586,16 +673,21 @@ def export_form_csv(form_id: int, db: Session = Depends(get_db), username: str =
 
     output.seek(0)
 
-    # Sanitize form title for use in filename (remove special chars)
-    safe_title = "".join(c if c.isalnum() or c in " -_" else "" for c in form.title).strip().replace(" ", "_")
-    from datetime import date
-    filename = f"{date.today().isoformat()}_{safe_title}.csv"
+    from urllib.parse import quote
+    safe_title = "".join(c if c.isascii() and c.isalnum() or c in " -_" else "" for c in form.title).strip().replace(" ", "_")
+    ascii_filename = f"{date.today().isoformat()}_{safe_title if safe_title else 'export'}.csv"
+
+    # RFC 5987 unicode filename for browsers that support it (handles Czech chars etc.)
+    utf8_filename = quote(f"{date.today().isoformat()}_{form.title}.csv", safe="-_.")
+    content_disposition = f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{utf8_filename}'
 
     return StreamingResponse(
         iter([output.getvalue()]),
-        media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": content_disposition}
     )
+
+
 
 @app.delete("/forms/{form_id}/submissions", status_code=204)
 def delete_all_responses(form_id: int, db: Session = Depends(get_db), username: str = Depends(get_current_username)):

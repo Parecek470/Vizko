@@ -63,7 +63,7 @@ export default function FormDetail() {
     }
 
     const handleExport = () => {
-        apiFetch('/forms/${id}/export/csv').then(async (res) => {
+        apiFetch(`/forms/${id}/export/csv`).then(async (res) => {
             if (!res.ok) return console.error("Export failed:", res.status);
             const blob = await res.blob();
             const objectUrl = URL.createObjectURL(blob);

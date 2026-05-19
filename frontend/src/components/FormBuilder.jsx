@@ -110,7 +110,8 @@ export default function FormBuilder() {
     }, [savePanelOpen]);
 
     const handleAddPage = () => {
-        const newPages = [...pages, { page_number: pages.length + 1, title: '', questions: [] }];
+        const newPages = [...JSON.parse(JSON.stringify(pages)), { page_number: pages.length + 1, title: '', questions: [] }];
+
         setPages(newPages);
         setSelectedItem({ type: 'page', pageIndex: newPages.length - 1, qIndex: null });
     };
@@ -134,7 +135,7 @@ export default function FormBuilder() {
             });
         }
 
-        const newPages = [...pages];
+        const newPages = [...JSON.parse(JSON.stringify(pages))];
         newPages.splice(pageIndex, 1);
         newPages.forEach((p, i) => p.page_number = i + 1);
         setPages(newPages);
@@ -142,13 +143,13 @@ export default function FormBuilder() {
     };
 
     const handlePageChange = (pageIndex, field, value) => {
-        const newPages = [...pages];
+        const newPages = [...JSON.parse(JSON.stringify(pages))];
         newPages[pageIndex][field] = value;
         setPages(newPages);
     };
 
     const handleAddQuestion = (pageIndex) => {
-        const newPages = [...pages];
+        const newPages = [...JSON.parse(JSON.stringify(pages))];
         const newQuestion = {
             text: 'New Question',
             question_type: 'single_choice',
@@ -188,13 +189,13 @@ export default function FormBuilder() {
         }
 
         if (isLastQuestionOnPage && !isLastPage) {
-            const newPages = [...pages];
+            const newPages = [...JSON.parse(JSON.stringify(pages))];
             newPages.splice(pageIndex, 1);
             newPages.forEach((p, i) => p.page_number = i + 1);
             setPages(newPages);
             setSelectedItem({ type: 'form', pageIndex: null, qIndex: null });
         } else {
-            const newPages = [...pages];
+            const newPages = [...JSON.parse(JSON.stringify(pages))];
             newPages[pageIndex].questions.splice(qIndex, 1);
             newPages[pageIndex].questions.forEach((q, i) => q.order = i + 1);
             setPages(newPages);
@@ -203,7 +204,7 @@ export default function FormBuilder() {
     };
 
     const handleQuestionChange = (pageIndex, qIndex, field, value) => {
-        const newPages = [...pages];
+        const newPages = [...JSON.parse(JSON.stringify(pages))];
         newPages[pageIndex].questions[qIndex][field] = value;
 
         if (field === 'question_type') {
@@ -223,7 +224,7 @@ export default function FormBuilder() {
     };
 
     const handleAddOption = (pageIndex, qIndex) => {
-        const newPages = [...pages];
+        const newPages = [...JSON.parse(JSON.stringify(pages))];
         newPages[pageIndex].questions[qIndex].options.push({
             text: '',
             order: newPages[pageIndex].questions[qIndex].options.length + 1
@@ -232,14 +233,14 @@ export default function FormBuilder() {
     };
 
     const handleRemoveOption = (pageIndex, qIndex, optIndex) => {
-        const newPages = [...pages];
+        const newPages = [...JSON.parse(JSON.stringify(pages))];
         newPages[pageIndex].questions[qIndex].options.splice(optIndex, 1);
         newPages[pageIndex].questions[qIndex].options.forEach((opt, i) => opt.order = i + 1);
         setPages(newPages);
     };
 
     const handleOptionChange = (pageIndex, qIndex, optIndex, value) => {
-        const newPages = [...pages];
+        const newPages = [...JSON.parse(JSON.stringify(pages))];
         newPages[pageIndex].questions[qIndex].options[optIndex].text = value;
         setPages(newPages);
     };
