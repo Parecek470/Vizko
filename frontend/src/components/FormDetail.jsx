@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Paper, Button, CircularProgress, Chip } from '@mui/material';
+import { Box, Typography, Paper, Button, CircularProgress, Chip,Dialog, DialogTitle, DialogContent, DialogActions,
+    Snackbar, Alert, Tooltip } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useForms } from '../context/FormContext';
 import {apiFetch} from "../utils/api.js";
@@ -8,6 +9,11 @@ import DownloadIcon from '@mui/icons-material/Download';
 import EditIcon from '@mui/icons-material/Edit';
 import CopyAllIcon from '@mui/icons-material/CopyAll';
 import { getCurrentUsername} from "../utils/auth.js";
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import QrCode2Icon from '@mui/icons-material/QrCode2';
+import { QRCodeSVG } from 'qrcode.react';
+import IconButton from '@mui/material/IconButton';
+
 
 export default function FormDetail() {
     const { id } = useParams(); // Gets the ID from the URL
@@ -17,6 +23,10 @@ export default function FormDetail() {
 
     const [form, setForm] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [qrOpen, setQrOpen] = useState(false);
+    const [copied, setCopied] = useState(false);
+
+
 
     useEffect(() => {
         const fetchFormDetail = async () => {
@@ -38,9 +48,16 @@ export default function FormDetail() {
     if (loading) return <CircularProgress sx={{ m: 4 }} />;
     if (!form) return <Typography>Form not found.</Typography>;
 
+    const joinUrl = `${window.location.origin}/join?code=${form.join_code ?? ''}`;
+
     const currentUser = getCurrentUsername();
     const isOwner = form.owner === currentUser;
     const isReadOnly = !isOwner;
+
+    const handleCopyCode = async () => {
+        await navigator.clipboard.writeText(form.join_code);
+        setCopied(true);
+    };
 
     const handleDelete = async () => {
         if (!window.confirm("Are you sure you want to delete this form and all its responses?")) return;
@@ -126,9 +143,21 @@ export default function FormDetail() {
                     {form.description || "No description provided."}
                 </Typography>
 
-                <Typography variant="h2" align={"center"} sx={{ mt: 2, mb: 1 }}>
-                    Join Code: <strong>{form.join_code}</strong>
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mt: 2, mb: 1 }}>
+                    <Typography variant="h2">
+                        <strong>{form.join_code}</strong>
+                    </Typography>
+                    <Tooltip title="Copy join code">
+                        <IconButton onClick={handleCopyCode} size="large" color="primary">
+                            <ContentCopyIcon fontSize="large" />
+                        </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Show QR code">
+                        <IconButton onClick={() => setQrOpen(true)} size="large" color="primary">
+                            <QrCode2Icon fontSize="large" />
+                        </IconButton>
+                    </Tooltip>
+                </Box>
 
                 <Box sx={{ mt: 4, display: 'flex', justifyContent: 'space-between', gap: 2, flexWrap: 'wrap' }}>
 
@@ -169,6 +198,33 @@ export default function FormDetail() {
                     </Box>
                 </Box>
             </Paper>
+
+            {/* QR Code Dialog */}
+            <Dialog open={qrOpen} onClose={() => setQrOpen(false)} maxWidth="xs" fullWidth>
+                <DialogTitle>Scan to Join</DialogTitle>
+                <DialogContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                    <QRCodeSVG value={joinUrl} size={220} />
+                    <Typography variant="body2" color="text.secondary">
+                        {joinUrl}
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setQrOpen(false)}>Close</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Copy Snackbar */}
+            <Snackbar
+                open={copied}
+                autoHideDuration={2000}
+                onClose={() => setCopied(false)}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert severity="success" variant="filled" onClose={() => setCopied(false)}>
+                    Join code copied!
+                </Alert>
+            </Snackbar>
+
         </Box>
     );
 }

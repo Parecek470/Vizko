@@ -45,6 +45,8 @@ export default function FormBuilder() {
     const [loadingForm, setLoadingForm] = useState(false);
     const [savePanelOpen, setSavePanelOpen] = useState(false);
     const savePanelRef = useRef(null);
+    const optionRefs = useRef({});
+    const pendingFocusKey = useRef(null);
 
     useEffect(() => {
         if (!isEditing || !id) return;
@@ -108,6 +110,16 @@ export default function FormBuilder() {
         if (savePanelOpen) document.addEventListener('mousedown', handleClickOutside);
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [savePanelOpen]);
+
+    useEffect(() => {
+        if (pendingFocusKey.current) {
+            const el = optionRefs.current[pendingFocusKey.current];
+            if (el) {
+                el.focus();
+                pendingFocusKey.current = null;
+            }
+        }
+    });
 
     const handleAddPage = () => {
         const newPages = [...JSON.parse(JSON.stringify(pages)), { page_number: pages.length + 1, title: '', questions: [] }];
@@ -225,10 +237,12 @@ export default function FormBuilder() {
 
     const handleAddOption = (pageIndex, qIndex) => {
         const newPages = [...JSON.parse(JSON.stringify(pages))];
+        const newOptIndex = newPages[pageIndex].questions[qIndex].options.length;
         newPages[pageIndex].questions[qIndex].options.push({
             text: '',
-            order: newPages[pageIndex].questions[qIndex].options.length + 1
+            order: newOptIndex + 1,
         });
+        pendingFocusKey.current = `${pageIndex}-${qIndex}-${newOptIndex}`;
         setPages(newPages);
     };
 
@@ -376,6 +390,8 @@ export default function FormBuilder() {
                 label="Page Title"
                 fullWidth
                 variant="outlined"
+                placeholder={`Page ${pages[pageIndex].page_number}`}
+                helperText="Leave empty to use the default 'Page N' label, or type a custom title to replace it."
                 value={pages[pageIndex].title}
                 onChange={(e) => handlePageChange(pageIndex, 'title', e.target.value)}
                 sx={{ mb: 3 }}
@@ -449,6 +465,11 @@ export default function FormBuilder() {
                                     placeholder={`Option ${oIndex + 1}`}
                                     value={opt.text}
                                     onChange={(e) => handleOptionChange(pageIndex, qIndex, oIndex, e.target.value)}
+                                    inputRef={(el) => {
+                                        const key = `${pageIndex}-${qIndex}-${oIndex}`;
+                                        if (el) optionRefs.current[key] = el;
+                                        else delete optionRefs.current[key];
+                                    }}
                                     sx={{ mr: 1 }}
                                 />
                                 <IconButton
@@ -584,7 +605,7 @@ export default function FormBuilder() {
                         <Box key={pIndex} sx={{ mb: 6 }}>
                             <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
                                 <Typography variant="h5" sx={{ flexGrow: 1, color: '#424242' }}>
-                                    Page {page.page_number}: {page.title}
+                                    {page.title ? page.title : `Page ${page.page_number}`}
                                 </Typography>
                                 <Button
                                     size="small"

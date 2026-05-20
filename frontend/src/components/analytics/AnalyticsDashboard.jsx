@@ -61,7 +61,7 @@ export default function AnalyticsDashboard() {
 
     return (
         <Box sx={{ display: 'flex', height: 'calc(100vh - 64px)' }}>
-            <Paper elevation={2} sx={{ width: '20vh', overflowY: 'auto', borderRadius: 0 }}>
+            <Paper elevation={2} sx={{ width: '10vw', overflowY: 'auto', borderRadius: 0 }}>
                 <Box sx={{ p: 2, bgcolor: 'primary.dark', color: 'white' }}>
                         <Link
                             component={RouterLink}

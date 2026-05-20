@@ -5,10 +5,21 @@ import {
     DialogContentText, DialogActions, Chip, Stack, Divider,
 } from '@mui/material';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
-import { Link as RouterLink } from 'react-router-dom';
+import LogoutIcon from '@mui/icons-material/Logout';
+import { Link as RouterLink, useLocation, useNavigate } from 'react-router-dom';
+import { TOKEN_KEY } from '../utils/auth';
 
 export default function Topbar({ isTeacherView }) {
     const [aboutOpen, setAboutOpen] = useState(false);
+    const location = useLocation();
+    const navigate = useNavigate();
+
+    const isLoginPage = location.pathname === '/login';
+
+    const handleLogout = () => {
+        localStorage.removeItem(TOKEN_KEY);
+        navigate('/');
+    };
 
     return (
         <>
@@ -28,14 +39,32 @@ export default function Topbar({ isTeacherView }) {
                         <InfoOutlinedIcon />
                     </IconButton>
 
-                    {isTeacherView ? (
-                        <Button color="inherit" component={RouterLink} to="/" sx={{ fontWeight: 'bold' }}>
-                            Student Access
-                        </Button>
-                    ) : (
-                        <Button color="inherit" component={RouterLink} to="/login" sx={{ fontWeight: 'bold' }}>
-                            Teacher Access
-                        </Button>
+                    {/* Teacher/Student toggle — hidden on login page */}
+                    {!isLoginPage && (
+                        isTeacherView ? (
+                            <>
+                                <Button
+                                    color="inherit"
+                                    component={RouterLink}
+                                    to="/"
+                                    sx={{ fontWeight: 'bold', mr: 1 }}
+                                >
+                                    Student Access
+                                </Button>
+                                <Button
+                                    color="inherit"
+                                    startIcon={<LogoutIcon />}
+                                    onClick={handleLogout}
+                                    sx={{ fontWeight: 'bold' }}
+                                >
+                                    Logout
+                                </Button>
+                            </>
+                        ) : (
+                            <Button color="inherit" component={RouterLink} to="/login" sx={{ fontWeight: 'bold' }}>
+                                Teacher Access
+                            </Button>
+                        )
                     )}
                 </Toolbar>
             </AppBar>
@@ -49,18 +78,14 @@ export default function Topbar({ isTeacherView }) {
                         responses, and visualizing the results through interactive charts and analytics.
                         It was built as a bachelor's degree final project.
                     </DialogContentText>
-
                     <Divider sx={{ my: 2 }} />
-
                     <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                         AUTHOR
                     </Typography>
                     <Typography variant="body2" gutterBottom>
                         Marek Mänzel — A23B0227P, Západočeská univerzita v Plzni, 2025/2026
                     </Typography>
-
                     <Divider sx={{ my: 2 }} />
-
                     <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                         TECH STACK
                     </Typography>

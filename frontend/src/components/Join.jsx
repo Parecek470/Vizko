@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState,useEffect  } from 'react';
+import { useNavigate, useSearchParams  } from 'react-router-dom';
 import { Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
 import {publicFetch} from "../utils/api.js";
 
@@ -7,6 +7,19 @@ export default function Join() {
     const [code, setCode] = useState('');
     const [error, setError] = useState(null);
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+
+    useEffect(() => {
+        const codeFromUrl = searchParams.get('code');
+        if (codeFromUrl) {
+            setCode(codeFromUrl);
+            // Auto-submit: hit the API directly
+            publicFetch(`/join/${codeFromUrl}`).then(res => {
+                if (res.ok) navigate(`/respond/${codeFromUrl}`);
+                else res.json().then(data => setError(data.detail || "Invalid join code"));
+            }).catch(() => setError("Cannot connect to server."));
+        }
+    }, []);
 
     const handleJoin = async (e) => {
         e.preventDefault();

@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Box, Paper, Typography, TextField, Button, Alert } from '@mui/material';
 import {publicFetch} from "../utils/api.js";
 import {useForms} from "../context/FormContext.jsx";
+import { useEffect } from 'react';
+import { TOKEN_KEY } from '../utils/auth';
 
 export default function EditorLogin() {
     const [username, setUsername] = useState('');
@@ -10,6 +12,7 @@ export default function EditorLogin() {
     const [error, setError] = useState(null);
     const navigate = useNavigate();
     const { refreshForms } = useForms();
+
 
     const handleLogin = async (e) => {
         e.preventDefault();
