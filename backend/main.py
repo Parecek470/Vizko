@@ -70,6 +70,7 @@ def get_db():
 def get_all_forms(db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Fetches a lightweight list of all forms."""
     forms = db.query(models.Form).filter((models.Form.owner == username)|(models.Form.is_shared)).all()
+    
     return forms
 
 # 2. THE DETAIL ROUTE (For the Main Dashboard View)
@@ -98,6 +99,9 @@ def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db), us
         owner=username,
         is_shared=form_data.is_shared,
     )
+    if db_form.is_active:
+        db_form.opened_at = models.utc_now()
+
     db.add(db_form)
     db.flush()
 
@@ -120,6 +124,13 @@ def replace_form_structure(form_id: int, form_data: schemas.FormCreate, db: Sess
 
     form.title = form_data.title
     form.description = form_data.description
+    if form.is_active != form_data.is_active:
+        if form_data.is_active:
+            form.opened_at = models.utc_now()
+            form.closed_at = None
+        else:
+            form.closed_at = models.utc_now()
+
     form.is_active = form_data.is_active
     form.is_shared = form_data.is_shared
 
@@ -133,7 +144,7 @@ def replace_form_structure(form_id: int, form_data: schemas.FormCreate, db: Sess
     db.refresh(form)
     return form
 
-# Helper — not a route, just a plain function
+# Helper — for updating pages
 def _build_pages_for_form(form_id: int, pages_data, db: Session):
     """Inserts pages, questions, and options for a given form_id."""
     for page_in in pages_data:
@@ -179,6 +190,12 @@ def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Sessio
     # Update only metadata
     form.title = form_update.title
     form.description = form_update.description
+    if form.is_active != form_update.is_active:
+        if form_update.is_active:
+            form.opened_at = models.utc_now()
+            form.closed_at = None
+        else:
+            form.closed_at = models.utc_now()
     form.is_active = form_update.is_active
     
     db.commit()
@@ -553,6 +570,12 @@ def patch_form_text(form_id: int, form_data: schemas.FormCreate, db: Session = D
     # Update metadata
     form.title = form_data.title
     form.description = form_data.description
+    if form.is_active != form_data.is_active:
+        if form_data.is_active:
+            form.opened_at = models.utc_now()
+            form.closed_at = None
+        else:
+            form.closed_at = models.utc_now()
     form.is_active = form_data.is_active
 
     for page_in in form_data.pages:
@@ -591,6 +614,9 @@ def delete_question(form_id: int, question_id: int, db: Session = Depends(get_db
     if question.page.form.owner != username:
         raise HTTPException(status_code=403, detail="Access denied")
 
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    form.updated_at = models.utc_now()
+
     db.delete(question)
     db.commit()
 
@@ -608,6 +634,9 @@ def delete_page(form_id: int, page_id: int, db: Session = Depends(get_db), usern
         raise HTTPException(status_code=404, detail="Page not found")
     if page.form.owner != username:
         raise HTTPException(status_code=403, detail="Access denied")
+
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    form.updated_at = models.utc_now()
 
     db.delete(page)
     db.commit()

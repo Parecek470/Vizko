@@ -1,10 +1,13 @@
 import enum
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Enum, Text, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy import Table, DateTime
-from datetime import datetime
+from datetime import datetime, timezone
 from database import Base
 from constants import QuestionType
+
+def utc_now():
+    return datetime.now(timezone.utc)
 
 class Form(Base):
     __tablename__ = "forms"
@@ -13,9 +16,16 @@ class Form(Base):
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
     is_active = Column(Boolean, default=False)
-    
-    # We will generate this in FastAPI, so the user doesn't have to
+
+    # automatically generated
     join_code = Column(String, unique=True, index=True)
+
+    # metadata
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
+
+    opened_at = Column(DateTime, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
 
     owner = Column(String, nullable=False, default="unknown")
     is_shared = Column(Boolean, default=False) 
@@ -28,6 +38,12 @@ class Form(Base):
     @property
     def response_count(self) -> int:
         return len(self.submissions)
+
+    @property
+    def last_submission_at(self) -> datetime | None:
+        if not self.submissions:
+            return None
+        return max(submission.submitted_at for submission in self.submissions)
 
 class Page(Base):
     __tablename__ = "pages"
@@ -90,7 +106,7 @@ class FormSubmission(Base):
 
 
 # 2. Association Table: Handles Multiple Choice questions cleanly
-# This allows one answer to be linked to many options, and pure SQL JOINs for your charts
+# This allows one answer to be linked to many options, and pure SQL JOINs for charts
 answer_options_table = Table(
     "answer_options",
     Base.metadata,

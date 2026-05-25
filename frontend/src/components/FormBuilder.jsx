@@ -4,7 +4,7 @@ import {
     Box, Typography, Paper, TextField, Switch, FormGroup,
     FormControlLabel, Button, Alert, Card, CardContent,
     IconButton, Select, MenuItem, InputLabel, FormControl,
-    Grid, Divider, CircularProgress, Fab, Tooltip, Chip, Collapse
+    Grid, Divider, CircularProgress, Fab, Tooltip, Chip, Collapse, RadioGroup, Radio, Checkbox, Slider
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddCircleIcon from '@mui/icons-material/AddCircle';
@@ -293,6 +293,59 @@ export default function FormBuilder() {
                 };
         }
     };
+
+    const renderQuestionPreview = (question) => {
+        const { question_type, options = [], scale_min, scale_max, scale_min_label, scale_max_label } = question;
+
+        const previewOptions = options.length >0 ? options.slice(0,3):[ {text: 'Option 1'}, {text: 'Option 2'}, {text: 'Option 3'}];
+
+        if(question_type ==='single_choice' || question_type === 'multiple_choice'){
+            return (
+                <RadioGroup sx={{ mt: 1}}>
+                    {previewOptions.map((opt, i) => (
+                        <FormControlLabel
+                            key={i}
+                            label={opt.text}
+                            value={opt.text}
+                            control={question_type === 'single_choice' ? (<Radio disabled/>) : (<Checkbox disabled/>)}
+                        />
+                    ))}
+                </RadioGroup>
+            )
+        }
+        if(question_type === 'scale'){
+            const min = scale_min ?? 0;
+            const max = scale_max ?? 5;
+            return (
+
+            <Box sx={{ mt: 2, ml:3, maxWidth: 300}}>
+                <Slider
+                    value={(min+max)/2}
+                    min={min}
+                    max={max}
+                    step={1}
+                    marks={[
+                        {value:min, label:scale_min_label===""?String(min):scale_min_label },
+                        {value:max, label:scale_max_label===""?String(max):scale_max_label },
+                    ]}
+                    disabled
+                />
+            </Box>
+            );
+        }
+        if(question_type === 'text_open'){
+            return (
+                <TextField
+                    disabled
+                    fullWidth
+                    size="small"
+                    sx={{ mt: 1 }}
+                    placeholder="Here goes your answer..."
+                />
+            );
+        }
+        return null;
+    }
 
     const handleSubmit = async () => {
         if (!title.trim()) {
@@ -659,6 +712,7 @@ export default function FormBuilder() {
                                                     />
                                                 )}
                                         </Box>
+                                        {renderQuestionPreview(question)}
                                     </Paper>
                                 );
                             })}

@@ -15,6 +15,7 @@ import {
 import AddIcon from '@mui/icons-material/Add';
 import { useForms } from '../context/FormContext';
 import { getCurrentUsername } from '../utils/auth';
+import { formatDateTimeShort} from "../utils/date.js";
 
 export default function Sidebar() {
     const { forms, loading } = useForms();
@@ -82,6 +83,7 @@ export default function Sidebar() {
                                             pl: 2,
                                         }}
                                     >
+
                                         <ListItemText
                                             primary={
                                                 <Typography
@@ -97,7 +99,22 @@ export default function Sidebar() {
                                                     {form.title}
                                                 </Typography>
                                             }
-                                            secondary={`${form.response_count} Responses`}
+                                            secondary={
+                                                <Box
+                                                    sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}
+                                                    component="div"
+                                                >
+                                                    <Typography variant="caption" color="text.secondary" component="div">
+                                                        {`${form.response_count} responses`}
+                                                    </Typography>
+
+                                                    {form.created_at && (
+                                                        <Typography variant="caption" color="text.secondary" component="div">
+                                                            {`Created: ${formatDateTimeShort(form.created_at)}`}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
+                                            }
                                         />
                                         <Chip
                                             label={form.is_active ? "Live" : "Draft"}
@@ -136,7 +153,22 @@ export default function Sidebar() {
                                                                 {form.title}
                                                             </Typography>
                                                         }
-                                                        secondary={`${form.response_count} Responses`}
+                                                        secondary={
+                                                            <Box
+                                                                sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}
+                                                                component="div"
+                                                            >
+                                                                <Typography variant="caption" color="text.secondary" component="div">
+                                                                    {`${form.response_count} responses`}
+                                                                </Typography>
+
+                                                                {form.created_at && (
+                                                                    <Typography variant="caption" color="text.secondary" component="div">
+                                                                        {`Created: ${formatDateTimeShort(form.created_at)}`}
+                                                                    </Typography>
+                                                                )}
+                                                            </Box>
+                                                        }
                                                     />
                                                     <Chip
                                                         label="Shared"

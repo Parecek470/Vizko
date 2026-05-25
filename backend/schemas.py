@@ -80,6 +80,11 @@ class FormSummaryResponse(BaseModel):
     response_count: int
     is_shared: bool
     owner:str
+    created_at: datetime
+    updated_at: datetime
+    opened_at: datetime| None = None
+    closed_at: datetime| None = None
+    last_submission_at: datetime | None = None
     model_config = ConfigDict(from_attributes=True)
 
 class FormDetailResponse(BaseModel):
@@ -91,6 +96,11 @@ class FormDetailResponse(BaseModel):
     response_count: int
     is_shared: bool
     owner: str
+    created_at: datetime
+    updated_at: datetime
+    opened_at: datetime| None = None
+    closed_at: datetime| None = None
+    last_submission_at: datetime | None = None
     pages: List[PageResponse]
     model_config = ConfigDict(from_attributes=True)
 

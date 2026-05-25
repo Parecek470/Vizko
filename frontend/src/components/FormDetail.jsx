@@ -13,6 +13,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import QrCode2Icon from '@mui/icons-material/QrCode2';
 import { QRCodeSVG } from 'qrcode.react';
 import IconButton from '@mui/material/IconButton';
+import {formatDateTimeLong} from "../utils/date.js";
 
 
 export default function FormDetail() {
@@ -53,6 +54,8 @@ export default function FormDetail() {
     const currentUser = getCurrentUsername();
     const isOwner = form.owner === currentUser;
     const isReadOnly = !isOwner;
+
+
 
     const handleCopyCode = async () => {
         await navigator.clipboard.writeText(form.join_code);
@@ -142,6 +145,26 @@ export default function FormDetail() {
                 <Typography color="text.secondary" paragraph>
                     {form.description || "No description provided."}
                 </Typography>
+
+                <Box sx={{ mt: 2, mb: 3, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                        Created: {formatDateTimeLong(form.created_at) ?? 'Unknown'}
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary">
+                        Last updated: {formatDateTimeLong(form.updated_at) ?? 'Unknown'}
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary">
+                        Open window:{" "}
+                        {form.opened_at
+                            ? `${formatDateTimeLong(form.opened_at)} ${
+                                form.closed_at ? `– ${formatDateTimeLong(form.closed_at)}` : '(still open)'
+                            }`
+                            : 'Not opened yet'}
+                    </Typography>
+                    <Typography variant="subtitle2" color="text.secondary">
+                        Last submission: {formatDateTimeLong(form.last_submission_at) ?? 'No submissions yet'}
+                    </Typography>
+                </Box>
 
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mt: 2, mb: 1 }}>
                     <Typography variant="h2">
