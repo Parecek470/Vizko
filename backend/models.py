@@ -9,13 +9,18 @@ from constants import QuestionType
 def utc_now():
     return datetime.now(timezone.utc)
 
+class FormStatus(enum.Enum):
+    DRAFT = "draft"
+    LIVE = "live"
+    ARCHIVED = "archived"
+
 class Form(Base):
     __tablename__ = "forms"
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String, nullable=False)
     description = Column(Text, nullable=True)
-    is_active = Column(Boolean, default=False)
+    status = Column(Enum(FormStatus), default=FormStatus.DRAFT, nullable=False)
 
     # automatically generated
     join_code = Column(String, unique=True, index=True)
@@ -34,6 +39,10 @@ class Form(Base):
     # it automatically deletes all Pages and Questions inside it.
     pages = relationship("Page", back_populates="form", cascade="all, delete-orphan")
     submissions = relationship("FormSubmission", back_populates="form", cascade="all, delete-orphan")
+
+    @property
+    def is_active(self) -> bool:
+        return self.status == FormStatus.LIVE
 
     @property
     def response_count(self) -> int:

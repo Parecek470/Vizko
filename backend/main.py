@@ -12,6 +12,7 @@ from fastapi.responses import StreamingResponse
 import csv
 import io
 from datetime import date
+from models import FormStatus
 
 
 # my classes
@@ -96,6 +97,7 @@ def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db), us
         description=form_data.description,
         join_code=utils.get_unique_join_code(db),
         is_active=form_data.is_active,
+        status = FormStatus.LIVE if form_data.is_active else FormStatus.DRAFT,
         owner=username,
         is_shared=form_data.is_shared,
     )
@@ -124,14 +126,15 @@ def replace_form_structure(form_id: int, form_data: schemas.FormCreate, db: Sess
 
     form.title = form_data.title
     form.description = form_data.description
-    if form.is_active != form_data.is_active:
-        if form_data.is_active:
-            form.opened_at = models.utc_now()
-            form.closed_at = None
-        else:
-            form.closed_at = models.utc_now()
+    if form.status != FormStatus.ARCHIVED:
+        if form.is_active != form_data.is_active:
+            if form_data.is_active:
+                form.opened_at = models.utc_now()
+                form.closed_at = None
+            else:
+                form.closed_at = models.utc_now()
 
-    form.is_active = form_data.is_active
+        form.is_active = form_data.is_active
     form.is_shared = form_data.is_shared
 
     for page in list(form.pages):

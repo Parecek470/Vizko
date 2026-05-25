@@ -38,6 +38,16 @@ function sortComparator(field, direction){
     }
 }
 
+function getStatusChip(status) {
+    const map = {
+        LIVE: { color: 'success', label: 'Live' },
+        DRAFT: { color: 'default', label: 'Draft' },
+        ARCHIVED: { color: 'warning', label: 'Archived' },
+    };
+    return map[status] ?? map.DRAFT;
+}
+
+
 export default function Sidebar() {
     const { forms, loading } = useForms();
     const currentUser = getCurrentUsername();
@@ -182,9 +192,9 @@ export default function Sidebar() {
                                             </Box>
                                         </Box>
                                         <Chip
-                                            label={form.is_active ? 'Live' : 'Draft'}
+                                            label={getStatusChip(form.status).label}
                                             size="small"
-                                            color={form.is_active ? 'success' : 'default'}
+                                            color={getStatusChip(form.status).color}
                                             sx={{ fontSize: '0.7rem', height: 20, flexShrink: 0 }}
                                         />
                                     </ListItemButton>

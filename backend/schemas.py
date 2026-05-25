@@ -3,6 +3,7 @@ from typing import List, Optional, Dict, Any
 from enum import Enum
 from datetime import datetime
 from constants import QuestionType
+from models import FormStatus
 
 
 
@@ -76,6 +77,7 @@ class PageResponse(BaseModel):
 class FormSummaryResponse(BaseModel):
     id: int
     title: str
+    status: FormStatus
     is_active: bool
     response_count: int
     is_shared: bool
@@ -91,6 +93,7 @@ class FormDetailResponse(BaseModel):
     id: int
     title: str
     description: Optional[str]
+    status: FormStatus
     is_active: bool
     join_code: str
     response_count: int

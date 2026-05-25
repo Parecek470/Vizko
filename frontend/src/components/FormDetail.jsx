@@ -107,6 +107,30 @@ export default function FormDetail() {
         navigate(`/forms/${id}/edit`);
     }
 
+    const handleArchive = async () => {
+        const res = await apiFetch(`/forms/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'ARCHIVED' }),
+        });
+        if (res.ok) {
+            setForm(await res.json());
+            await refreshForms();
+        }
+    };
+
+    const handleUnarchive = async () => {
+        const res = await apiFetch(`/forms/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'DRAFT' }),
+        });
+        if (res.ok) {
+            setForm(await res.json());
+            await refreshForms();
+        }
+    };
+
     const handleDuplicate = async () => {
         const res = await apiFetch(`/forms/${id}/duplicate`, { method: 'POST' });
         if (res.ok) {
@@ -138,8 +162,12 @@ export default function FormDetail() {
                         )}
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, width:260,flexShrink:0 , position: 'relative'}}>
                             <Chip
-                                label={form.is_active ? "Live" : "Draft"}
-                                color={form.is_active ? "success" : "default"}
+                                label={
+                                    form.status === 'LIVE'? 'Live':form.status === 'ARCHIVED' ? 'Archived' : 'Draft'
+                                }
+                                color={
+                                    form.status === 'live'? 'success' :form.status === 'archived' ? 'warning' : 'default'
+                                }
                             />
                             <Chip
                                 label={`${form.response_count} Responses`}
@@ -271,6 +299,16 @@ export default function FormDetail() {
                             <Button variant="outlined" startIcon={<EditIcon />} disabled={isReadOnly} onClick={handleEdit}>
                                 Edit form
                             </Button>
+
+                            {form.status !== 'archived' ? (
+                                <Button variant="outlined" color="warning" onClick={handleArchive} disabled={isReadOnly}>
+                                    Archive Form
+                                </Button>
+                            ) : (
+                                <Button variant="outlined" onClick={handleUnarchive} disabled={isReadOnly}>
+                                    Unarchive (→ Draft)
+                                </Button>
+                            )}
                         </Box>
                     </Box>
 
