@@ -22,7 +22,7 @@ import { formatDateTimeShort} from "../utils/date.js";
 
 const SORT_OPTIONS = [
     { value: 'created_at', label: 'Created Date' },
-    { value: 'last_submitted_at', label: 'Last answer time' },
+    { value: 'last_submission_at', label: 'Last answer time' },
 ]
 
 function sortComparator(field, direction){
@@ -154,6 +154,8 @@ export default function Sidebar() {
                                     >
 
                                         <ListItemText
+                                            primarytypographyprops={{ component: 'div' }}
+                                            secondarytypographyprops={{ component: 'div' }}
                                             primary={
                                                 <Typography
                                                     variant="subtitle2"
@@ -217,6 +219,8 @@ export default function Sidebar() {
                                                     }}
                                                 >
                                                     <ListItemText
+                                                        primarytypographyprops={{ component: 'div' }}
+                                                        secondarytypographyprops={{ component: 'div' }}
                                                         primary={
                                                             <Typography variant="subtitle2" sx={{ fontWeight: isActiveRoute ? 'bold' : 'normal' }}>
                                                                 {form.title}
