@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import {useState, useEffect, useMemo} from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     Box,
@@ -10,22 +10,52 @@ import {
     Button,
     Chip,
     Divider,
-    CircularProgress
+    CircularProgress, ToggleButton, ToggleButtonGroup, Tooltip, MenuItem, FormControl, InputLabel, Select
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import { useForms } from '../context/FormContext';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { getCurrentUsername } from '../utils/auth';
 import { formatDateTimeShort} from "../utils/date.js";
+
+
+const SORT_OPTIONS = [
+    { value: 'created_at', label: 'Created Date' },
+    { value: 'last_submitted_at', label: 'Last answer time' },
+]
+
+function sortComparator(field, direction){
+    return (a, b) => {
+        const aVal = a[field] ? new Date(a[field]).getTime() : null;
+        const bVal = b[field] ? new Date(b[field]).getTime() : null;
+
+        if (aVal === null && bVal === null) return 0;
+        if (aVal === null) return 1;
+        if (bVal === null) return -1;
+
+        return direction === 'asc' ? aVal - bVal : bVal - aVal;
+    }
+}
 
 export default function Sidebar() {
     const { forms, loading } = useForms();
     const currentUser = getCurrentUsername();
-    const myForms = forms.filter(f => f.owner === currentUser);
-    const sharedForms = forms.filter(f => f.owner !== currentUser);
 
     // React Router hooks for navigation
     const navigate = useNavigate();
     const location = useLocation();
+
+    const [sortField, setSortField] = useState('created_at');
+    const [sortDirection, setSortDirection] = useState('desc');
+
+    const { myForms, sharedForms } = useMemo(() => {
+        const comparator = sortComparator(sortField, sortDirection);
+        const mine   = forms.filter(f => f.owner === currentUser).sort(comparator);
+        const shared = forms.filter(f => f.owner !== currentUser).sort(comparator);
+        return { myForms: mine, sharedForms: shared };
+    }, [forms, currentUser, sortField, sortDirection]);
+
 
 
     return (
@@ -54,6 +84,45 @@ export default function Sidebar() {
                 >
                     Create New Form
                 </Button>
+            </Box>
+
+            <Divider />
+
+            <Box sx={{ px: 2, py: 1.5, display: 'flex', gap: 1, alignItems: 'center' }}>
+                <FormControl size="small" sx={{ flex: 1 }}>
+                    <InputLabel id="sort-field-label" sx={{ fontSize: '0.75rem' }}>
+                        Sort by
+                    </InputLabel>
+                    <Select
+                        labelId="sort-field-label"
+                        value={sortField}
+                        label="Sort by"
+                        onChange={(e) => setSortField(e.target.value)}
+                        sx={{ fontSize: '0.75rem' }}
+                    >
+                        {SORT_OPTIONS.map((opt) => (
+                            <MenuItem key={opt.value} value={opt.value} sx={{ fontSize: '0.75rem' }}>
+                                {opt.label}
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+
+                <Tooltip title={sortDirection === 'asc' ? 'Ascending' : 'Descending'}>
+                    <ToggleButtonGroup
+                        value={sortDirection}
+                        exclusive
+                        onChange={(_, newDir) => { if (newDir) setSortDirection(newDir); }}
+                        size="small"
+                    >
+                        <ToggleButton value="asc" aria-label="Sort ascending">
+                            <ArrowUpwardIcon fontSize="small" />
+                        </ToggleButton>
+                        <ToggleButton value="desc" aria-label="Sort descending">
+                            <ArrowDownwardIcon fontSize="small" />
+                        </ToggleButton>
+                    </ToggleButtonGroup>
+                </Tooltip>
             </Box>
 
             <Divider />
