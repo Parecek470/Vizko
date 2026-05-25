@@ -41,6 +41,8 @@ class FormCreate(BaseModel):
     # The React app will send the whole nested structure at once
     pages: List[PageCreate] = []
 
+class FormStatusUpdate(BaseModel):
+    status: FormStatus
 
 # ==========================================
 # RESPONSE SCHEMAS (Outgoing data to React)

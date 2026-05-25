@@ -108,10 +108,10 @@ export default function FormDetail() {
     }
 
     const handleArchive = async () => {
-        const res = await apiFetch(`/forms/${id}`, {
+        const res = await apiFetch(`/forms/${id}/status`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'ARCHIVED' }),
+            body: JSON.stringify({ status: 'archived' }),
         });
         if (res.ok) {
             setForm(await res.json());
@@ -120,10 +120,10 @@ export default function FormDetail() {
     };
 
     const handleUnarchive = async () => {
-        const res = await apiFetch(`/forms/${id}`, {
+        const res = await apiFetch(`/forms/${id}/status`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'DRAFT' }),
+            body: JSON.stringify({ status: 'draft' }),
         });
         if (res.ok) {
             setForm(await res.json());

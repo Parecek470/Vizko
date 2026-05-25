@@ -9,7 +9,7 @@ from constants import QuestionType
 def utc_now():
     return datetime.now(timezone.utc)
 
-class FormStatus(enum.Enum):
+class FormStatus(str, enum.Enum):
     DRAFT = "draft"
     LIVE = "live"
     ARCHIVED = "archived"

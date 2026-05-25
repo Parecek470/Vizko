@@ -92,16 +92,16 @@ def get_form_detail(form_id: int, db: Session = Depends(get_db), username: str =
 
 @app.post("/forms/", response_model=schemas.FormDetailResponse)
 def create_form(form_data: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+    initial_status = FormStatus.LIVE if form_data.is_active else FormStatus.DRAFT
     db_form = models.Form(
         title=form_data.title,
         description=form_data.description,
         join_code=utils.get_unique_join_code(db),
-        is_active=form_data.is_active,
-        status = FormStatus.LIVE if form_data.is_active else FormStatus.DRAFT,
+        status=initial_status,
         owner=username,
         is_shared=form_data.is_shared,
     )
-    if db_form.is_active:
+    if db_form.status == FormStatus.LIVE:
         db_form.opened_at = models.utc_now()
 
     db.add(db_form)
@@ -126,22 +126,23 @@ def replace_form_structure(form_id: int, form_data: schemas.FormCreate, db: Sess
 
     form.title = form_data.title
     form.description = form_data.description
-    if form.status != FormStatus.ARCHIVED:
-        if form.is_active != form_data.is_active:
-            if form_data.is_active:
+    form.is_shared = form_data.is_shared
+
+    if form.status != FormStatus.archived:
+        new_status = FormStatus.LIVE if form_data.is_active else FormStatus.DRAFT
+        if new_status != form.status:
+            if new_status == FormStatus.LIVE:
                 form.opened_at = models.utc_now()
                 form.closed_at = None
             else:
                 form.closed_at = models.utc_now()
-
-        form.is_active = form_data.is_active
-    form.is_shared = form_data.is_shared
+        form.status = new_status
 
     for page in list(form.pages):
         db.delete(page)
     db.flush()
 
-    _build_pages_for_form(form.id, form_data.pages, db)  # ← shared
+    _build_pages_for_form(form.id, form_data.pages, db)
 
     db.commit()
     db.refresh(form)
@@ -182,7 +183,7 @@ def _build_pages_for_form(form_id: int, pages_data, db: Session):
                 ))
 
 @app.put("/forms/{form_id}", response_model=schemas.FormSummaryResponse)
-def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
+def update_form_metadata(form_id: int, form_update: schemas.FormCreate, db: Session = Depends(get_db), username: str = Depends(get_current_username)):
     """Updates top-level form metadata."""
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
     if not form:
@@ -193,14 +194,17 @@ def update_form_status(form_id: int, form_update: schemas.FormCreate, db: Sessio
     # Update only metadata
     form.title = form_update.title
     form.description = form_update.description
-    if form.is_active != form_update.is_active:
-        if form_update.is_active:
-            form.opened_at = models.utc_now()
-            form.closed_at = None
-        else:
-            form.closed_at = models.utc_now()
-    form.is_active = form_update.is_active
-    
+
+    if form.status != FormStatus.archived:
+        new_status = FormStatus.live if form_update.is_active else FormStatus.draft
+        if new_status != form.status:
+            if new_status == FormStatus.live:
+                form.opened_at = models.utc_now()
+                form.closed_at = None
+            else:
+                form.closed_at = models.utc_now()
+        form.status = new_status
+
     db.commit()
     db.refresh(form)
     return form
@@ -217,6 +221,30 @@ def delete_form(form_id: int, db: Session = Depends(get_db), username: str = Dep
     db.delete(form)
     db.commit()
     return None
+
+@app.patch("/forms/{form_id}/status", response_model=schemas.FormSummaryResponse)
+def update_form_status(form_id: int,payload: schemas.FormStatusUpdate,db: Session = Depends(get_db),username: str = Depends(get_current_username)):
+    """Changes the form status"""
+    
+    form = db.query(models.Form).filter(models.Form.id == form_id).first()
+    if not form:
+        raise HTTPException(status_code=404, detail="Form not found")
+    if form.owner != username:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    new_status = payload.status
+
+    if new_status == FormStatus.live and form.status != FormStatus.live:
+        form.opened_at = models.utc_now()
+        form.closed_at = None
+    elif new_status != FormStatus.live and form.status == FormStatus.live:
+        form.closed_at = models.utc_now()
+
+    form.status = new_status
+
+    db.commit()
+    db.refresh(form)
+    return form
 
 # Respondents calls
 
@@ -236,8 +264,9 @@ def get_form_by_join_code(join_code: str, db: Session = Depends(get_db)):
 def submit_form_answers(form_id: int, submission: schemas.SubmissionCreate, db: Session = Depends(get_db)):
     """Submits answers for a specific form."""
     form = db.query(models.Form).filter(models.Form.id == form_id).first()
-    if not form or not form.is_active:
+    if not form or form.status != FormStatus.live:
         raise HTTPException(status_code=400, detail="Invalid or inactive form.")
+    
 
 
     # Build a lookup map: question_id -> Question object for every question on this form
@@ -509,7 +538,7 @@ def duplicate_form(form_id: int, db: Session = Depends(get_db), username: str = 
         title=f"{original_form.title} (copy)",
         description=original_form.description,
         join_code=utils.get_unique_join_code(db),
-        is_active=False,  # copies start as inactive — safer default
+        status=FormStatus.DRAFT,
         owner=username,
         is_shared=False,
     )
@@ -573,13 +602,16 @@ def patch_form_text(form_id: int, form_data: schemas.FormCreate, db: Session = D
     # Update metadata
     form.title = form_data.title
     form.description = form_data.description
-    if form.is_active != form_data.is_active:
-        if form_data.is_active:
-            form.opened_at = models.utc_now()
-            form.closed_at = None
-        else:
-            form.closed_at = models.utc_now()
-    form.is_active = form_data.is_active
+
+    if form.status != FormStatus.archived:
+        new_status = FormStatus.live if form_data.is_active else FormStatus.draft
+        if new_status != form.status:
+            if new_status == FormStatus.live:
+                form.opened_at = models.utc_now()
+                form.closed_at = None
+            else:
+                form.closed_at = models.utc_now()
+        form.status = new_status
 
     for page_in in form_data.pages:
         db_page = next((p for p in form.pages if p.page_number == page_in.page_number), None)
