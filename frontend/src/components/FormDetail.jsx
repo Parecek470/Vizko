@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Box, Typography, Paper, Button, CircularProgress, Chip,Dialog, DialogTitle, DialogContent, DialogActions,
-    Snackbar, Alert, Tooltip } from '@mui/material';
+import {
+    Box, Typography, Paper, Button, CircularProgress, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
+    Snackbar, Alert, Tooltip, Collapse
+} from '@mui/material';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import DeleteIcon from '@mui/icons-material/Delete';
 import { useForms } from '../context/FormContext';
 import {apiFetch} from "../utils/api.js";
@@ -26,6 +30,7 @@ export default function FormDetail() {
     const [loading, setLoading] = useState(true);
     const [qrOpen, setQrOpen] = useState(false);
     const [copied, setCopied] = useState(false);
+    const [timelineOpen, setTimelineOpen] = useState(false);
 
 
 
@@ -119,13 +124,19 @@ export default function FormDetail() {
     return (
         <Box sx={{ p: 4, maxWidth: 1000, mx: 'auto' }}>
             <Paper sx={{ p: 4 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h4">{form.title}</Typography>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
+                    <Box sx={{ display: 'flex',flexDirection:"column", gap: 2 }}>
+                        <Typography variant="h4" sx={{pt:0}}>{form.title}</Typography>
+
+                        <Typography color="text.secondary" paragraph>
+                            {form.description || "No description provided."}
+                        </Typography>
+                    </Box>
                     <Box sx={{ display: 'flex', gap: 2 }}>
                         {form.is_shared && (
                             <Chip label="Shared" color="secondary" size="medium" sx={{ ml: 1 }} />
                         )}
-                        <Box sx={{ display: 'flex', flexDirection:'column', gap: 1 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, width:260,flexShrink:0 , position: 'relative'}}>
                             <Chip
                                 label={form.is_active ? "Live" : "Draft"}
                                 color={form.is_active ? "success" : "default"}
@@ -136,35 +147,98 @@ export default function FormDetail() {
                                 variant="outlined"
                             />
 
+                            {/* Collapsible timeline */}
+                            <Box
+                                sx={{
+                                    mt: 1,
+                                    p: 1,
+                                    borderRadius: 2,
+                                    backgroundColor: 'grey.50',
+                                    border: '1px solid',
+                                    borderColor: 'grey.200',
+                                    width: '100%',
+                                }}
+                            >
+                                <Box
+                                    sx={{
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        cursor: 'pointer',
+                                    }}
+                                    onClick={() => setTimelineOpen((prev) => !prev)}
+                                >
+                                    <Typography variant="caption" fontWeight={600}>
+                                        Form timeline
+                                    </Typography>
+                                    <IconButton size="small">
+                                        {timelineOpen ? (
+                                            <ExpandLessIcon fontSize="small" />
+                                        ) : (
+                                            <ExpandMoreIcon fontSize="small" />
+                                        )}
+                                    </IconButton>
+                                </Box>
+
+                                <Collapse in={timelineOpen} timeout="auto" unmountOnExit>
+                                    <Box
+                                        sx={{
+                                            position: 'absolute',
+                                            top: '100%',
+                                            right: 0,
+                                            mt: 1,
+                                            p: 2,
+                                            borderRadius: 2,
+                                            backgroundColor: 'background.paper',
+                                            boxShadow: 3,
+                                            border: '1px solid',
+                                            borderColor: 'grey.300',
+                                            width: 260,
+                                            zIndex: 10,
+                                        }}
+                                    >
+                                        <Box
+                                            sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}
+                                            component="div"
+                                        >
+                                        <Typography variant="caption" color="text.secondary">
+                                            Created: {formatDateTimeLong(form.created_at) ?? 'Unknown'}
+                                        </Typography>
+
+                                        <Typography variant="caption" color="text.secondary">
+                                            Last updated: {formatDateTimeLong(form.updated_at) ?? 'Unknown'}
+                                        </Typography>
+
+                                        <Typography variant="caption" color="text.secondary">
+                                            Open window: {form.opened_at
+                                            ? `${formatDateTimeLong(form.opened_at)}${
+                                                form.closed_at
+                                                    ? ` – ${formatDateTimeLong(form.closed_at)}`
+                                                    : ' (still open)'
+                                            }`
+                                            : 'Not opened yet'}
+                                        </Typography>
+
+                                        <Typography variant="caption" color="text.secondary">
+                                            Last submission: {formatDateTimeLong(form.last_submission_at) ?? 'No submissions yet'}
+                                        </Typography>
+                                        </Box>
+                                    </Box>
+                                </Collapse>
+                            </Box>
                         </Box>
+
+
                     </Box>
 
 
+
+
                 </Box>
 
-                <Typography color="text.secondary" paragraph>
-                    {form.description || "No description provided."}
-                </Typography>
 
-                <Box sx={{ mt: 2, mb: 3, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                    <Typography variant="subtitle2" color="text.secondary">
-                        Created: {formatDateTimeLong(form.created_at) ?? 'Unknown'}
-                    </Typography>
-                    <Typography variant="subtitle2" color="text.secondary">
-                        Last updated: {formatDateTimeLong(form.updated_at) ?? 'Unknown'}
-                    </Typography>
-                    <Typography variant="subtitle2" color="text.secondary">
-                        Open window:{" "}
-                        {form.opened_at
-                            ? `${formatDateTimeLong(form.opened_at)} ${
-                                form.closed_at ? `– ${formatDateTimeLong(form.closed_at)}` : '(still open)'
-                            }`
-                            : 'Not opened yet'}
-                    </Typography>
-                    <Typography variant="subtitle2" color="text.secondary">
-                        Last submission: {formatDateTimeLong(form.last_submission_at) ?? 'No submissions yet'}
-                    </Typography>
-                </Box>
+
+
 
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mt: 2, mb: 1 }}>
                     <Typography variant="h2">
