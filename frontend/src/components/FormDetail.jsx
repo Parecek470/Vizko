@@ -128,7 +128,7 @@ export default function FormDetail() {
                     <Box sx={{ display: 'flex',flexDirection:"column", gap: 2 }}>
                         <Typography variant="h4" sx={{pt:0}}>{form.title}</Typography>
 
-                        <Typography color="text.secondary" paragraph>
+                        <Typography color="text.secondary" sx={{ mb: 2 }}>
                             {form.description || "No description provided."}
                         </Typography>
                     </Box>
@@ -230,16 +230,7 @@ export default function FormDetail() {
 
 
                     </Box>
-
-
-
-
                 </Box>
-
-
-
-
-
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, mt: 2, mb: 1 }}>
                     <Typography variant="h2">
                         <strong>{form.join_code}</strong>

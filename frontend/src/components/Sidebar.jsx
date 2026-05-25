@@ -150,48 +150,42 @@ export default function Sidebar() {
                                         sx={{
                                             borderLeft: isActiveRoute ? '4px solid #1976d2' : '4px solid transparent',
                                             pl: 2,
+                                            display: 'flex',
+                                            alignItems: 'center',
+                                            gap: 1,
                                         }}
                                     >
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
+                                            <Typography
+                                                variant="subtitle2"
+                                                sx={{
+                                                    fontWeight: 600,
+                                                    color: isActiveRoute ? 'primary.main' : 'text.primary',
+                                                    overflow: 'hidden',
+                                                    textOverflow: 'ellipsis',
+                                                    whiteSpace: 'nowrap',
+                                                }}
+                                            >
+                                                {form.title}
+                                            </Typography>
 
-                                        <ListItemText
-                                            primarytypographyprops={{ component: 'div' }}
-                                            secondarytypographyprops={{ component: 'div' }}
-                                            primary={
-                                                <Typography
-                                                    variant="subtitle2"
-                                                    sx={{
-                                                        fontWeight: 600,
-                                                        color: isActiveRoute ? 'primary.main' : 'text.primary',
-                                                        overflow: 'hidden',
-                                                        textOverflow: 'ellipsis',
-                                                        whiteSpace: 'nowrap',
-                                                    }}
-                                                >
-                                                    {form.title}
+                                            {/* Each line in its own Box to guarantee block stacking */}
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {`${form.response_count} responses`}
                                                 </Typography>
-                                            }
-                                            secondary={
-                                                <Box
-                                                    sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}
-                                                    component="div"
-                                                >
-                                                    <Typography variant="caption" color="text.secondary" component="div">
-                                                        {`${form.response_count} responses`}
+                                                {form.created_at && (
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {`Created: ${formatDateTimeShort(form.created_at)}`}
                                                     </Typography>
-
-                                                    {form.created_at && (
-                                                        <Typography variant="caption" color="text.secondary" component="div">
-                                                            {`Created: ${formatDateTimeShort(form.created_at)}`}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                            }
-                                        />
+                                                )}
+                                            </Box>
+                                        </Box>
                                         <Chip
-                                            label={form.is_active ? "Live" : "Draft"}
+                                            label={form.is_active ? 'Live' : 'Draft'}
                                             size="small"
-                                            color={form.is_active ? "success" : "default"}
-                                            sx={{ ml: 1, fontSize: '0.7rem', height: 20, flexShrink: 0 }}
+                                            color={form.is_active ? 'success' : 'default'}
+                                            sx={{ fontSize: '0.7rem', height: 20, flexShrink: 0 }}
                                         />
                                     </ListItemButton>
                                 </ListItem>
@@ -215,39 +209,43 @@ export default function Sidebar() {
                                                     onClick={() => navigate(`/forms/${form.id}`)}
                                                     sx={{
                                                         borderLeft: isActiveRoute ? '4px solid #9c27b0' : '4px solid transparent',
-                                                        pl: 2
+                                                        pl: 2,
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: 1,
                                                     }}
                                                 >
-                                                    <ListItemText
-                                                        primarytypographyprops={{ component: 'div' }}
-                                                        secondarytypographyprops={{ component: 'div' }}
-                                                        primary={
-                                                            <Typography variant="subtitle2" sx={{ fontWeight: isActiveRoute ? 'bold' : 'normal' }}>
-                                                                {form.title}
-                                                            </Typography>
-                                                        }
-                                                        secondary={
-                                                            <Box
-                                                                sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}
-                                                                component="div"
-                                                            >
-                                                                <Typography variant="caption" color="text.secondary" component="div">
-                                                                    {`${form.response_count} responses`}
-                                                                </Typography>
+                                                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                        <Typography
+                                                            variant="subtitle2"
+                                                            sx={{
+                                                                fontWeight: 600,
+                                                                color: isActiveRoute ? 'primary.main' : 'text.primary',
+                                                                overflow: 'hidden',
+                                                                textOverflow: 'ellipsis',
+                                                                whiteSpace: 'nowrap',
+                                                            }}
+                                                        >
+                                                            {form.title}
+                                                        </Typography>
 
-                                                                {form.created_at && (
-                                                                    <Typography variant="caption" color="text.secondary" component="div">
-                                                                        {`Created: ${formatDateTimeShort(form.created_at)}`}
-                                                                    </Typography>
-                                                                )}
-                                                            </Box>
-                                                        }
-                                                    />
+                                                        {/* Each line in its own Box to guarantee block stacking */}
+                                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                {`${form.response_count} responses`}
+                                                            </Typography>
+                                                            {form.created_at && (
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    {`Created: ${formatDateTimeShort(form.created_at)}`}
+                                                                </Typography>
+                                                            )}
+                                                        </Box>
+                                                    </Box>
                                                     <Chip
                                                         label="Shared"
                                                         size="small"
                                                         color="secondary"
-                                                        sx={{ ml: 1, fontSize: '0.7rem', height: 20 }}
+                                                        sx={{ fontSize: '0.7rem', height: 20, flexShrink: 0 }}
                                                     />
                                                 </ListItemButton>
                                             </ListItem>
